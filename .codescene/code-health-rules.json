@@ -1,0 +1,16 @@
+{
+    "usage" : "Persist this file inside your repositories as  ...",
+    "rule_sets" : [ {
+      "matching_content_path" : "test/**",
+      "matching_content_path_doc" : "Specify a glob pattern relative to ...",
+      "rules" : [],
+       "thresholds" : [ {
+              "name" : "function_cyclomatic_complexity_warning",
+              "value" : 10
+          }, {
+             "name" : "function_nesting_depth_warning",
+              "value" : 3
+          }
+        ]
+    } ]
+  }
