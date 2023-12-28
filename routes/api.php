@@ -48,7 +48,6 @@ Route::middleware(['auth:sanctum', 'checkstatus'])->group( function () {
         Route::get('accounts', 'getProfile');
         Route::put('accounts', 'updateProfile');
         Route::patch('accounts', 'partialUpdateProfile');
-        Route::delete('accounts', 'delete');
     });
 
      // admin section actions

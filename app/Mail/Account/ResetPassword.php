@@ -27,7 +27,7 @@ class ResetPassword extends Mailable
      */
     public function build()
     {
-        $markdownParams = ['name' => $this->message->name, 'website' => $this->message->website, 'resetLink' => $this->message->resetLink];
+        $markdownParams = ['email' => $this->message->email, 'website' => $this->message->website, 'resetLink' => $this->message->resetLink];
         $markdown = 'emails.account.reset-password';
 
         return $this->subject($this->message->subject)->markdown($markdown, $markdownParams);

@@ -24,16 +24,16 @@ class CheckStatus
         if ($user) {
             if ($user->status !== 1) {
                 // $user->tokens()->delete();
-                return $this->sendError('Invalid user status', null, HttpCode::Unauthorized);
+                return $this->sendError(['Invalid user status'], HttpCode::Unauthorized);
             }
             if ($user->email_verified_at === null) {
                 // $user->tokens()->delete();
-                return $this->sendError('Email not verified', null, HttpCode::Unauthorized);
+                return $this->sendError(['Email not verified'], HttpCode::Unauthorized);
             }
             return $response;
         }
         else {
-            return $this->sendError('Unauthorised', ['error'=>'Session not found'], HttpCode::Unauthorized);
+            return $this->sendError(['Session not found'], HttpCode::Unauthorized);
         }
     }
 
@@ -42,17 +42,12 @@ class CheckStatus
      *
      * @return \Illuminate\Http\Response
      */
-    private function sendError($error, $errorMessages = [], $code = 404)
+    private function sendError($errors = [], $status = 404)
     {
     	$response = [
-            'success' => false,
-            'message' => $error,
+            'errors' => $errors,
         ];
 
-        if(!empty($errorMessages)){
-            $response['data'] = $errorMessages;
-        }
-
-        return response()->json($response, $code);
+        return response()->json($response, $status);
     }
 }

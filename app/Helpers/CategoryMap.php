@@ -1,17 +1,23 @@
 <?php
 namespace App\Helpers;
-use App\Helpers\ArrayUtils;
+use App\Helpers\CategoryMapItem;
+use App\Helpers\CategoryMapItemBase;
 
+/**
+ * Helper class for mapping categories and creating a tree structure for them
+ */
 class CategoryMap
 {
     public $tree;
-    public $arrCategoryIndex; // map for categoryID
-    public $catListById; // map categories by id
-    public $catListBySlug; // map categories by slug
+    private $catListById; // map categories by id
+    private $catListBySlug; // map categories by slug
     private static $instance;
     private $categories;
 
-    // singleton
+    /**
+     * singleton instance
+     * @return \app\Helpers\CategoryMap
+     */
     public static function getInstance()
     {
         if (!isset(self::$instance)) {
@@ -25,7 +31,9 @@ class CategoryMap
 
     /**
      * create a mapping of the categories, using a non recursive method
-     * @param {array} $categories : categories from db, as array; they must be ordered by parent_id,order_index
+     *
+     * @param array $categories : categories from db, as array
+     * @return object the categories tree structure
      */
     public function mapCategories($categories)
     {
@@ -43,6 +51,8 @@ class CategoryMap
 
     /**
      * create a mapping of the categories, by Id and by Slug
+     *
+     * @param array $categoryList : categories from db, as array
      */
     private function indexCategories($categoryList)
     {
@@ -58,6 +68,7 @@ class CategoryMap
      * structure the categories which are stored in $this->catListById, as a tree
      * and set the children Ids and recursive children ids to the items
      *
+     * @return App\Helpers\CategoryMapItem a tree structure of the categories
      */
     private function createTreeStructure()
     {
@@ -86,8 +97,10 @@ class CategoryMap
     }
 
     /**
-     * structure the categories which are stored in $this->catListById,  as a tree
+     * structure the categories which are stored in $this->catListById, as a tree
      *
+     * @param number $exceptId if specified, will not include this categoryId and neither it's children and grand children
+     * @return App\Helpers\CategoryMapItem the tree structure except for the specified category and it's children and grand children
      */
     private function getTreeStructureExcept($exceptId = 0)
     {
@@ -126,10 +139,10 @@ class CategoryMap
     }
 
     /**
-     * verify if the parent or the ancestors of the given category the id equal to $parentId
+     * verify if the parent or an ancestor of the given category has the id equal to $parentId
      *
-     * @param CategoryMapItem $category the category for which to verify
-     * @param string $parentId the id of the parent to match against
+     * @param App\Helpers\CategoryMapItem $category the category for which to verify
+     * @param number $parentId the id of the parent to match against
      */
     private function childHasParent($category, $parentId)
     {
@@ -137,10 +150,13 @@ class CategoryMap
             return false;
         }
 
+        // check if the parent has the id equal to $parentId
         $upperParentId = $this->catListById[$category->parent_id]->parent_id;
         if ($parentId === $category->parent_id) {
             return true;
         }
+
+        // check all grand parents
         while ($upperParentId) {
             if ($upperParentId === $parentId)  {
                 return true;
@@ -152,17 +168,16 @@ class CategoryMap
     }
 
     /**
-     * add categoryId to parent and ancestors
+     * add categoryId to the childrenIds and recursiveChildrenIds of the parent and ancestors
      *
-     * @param CategoryMapItem $parentItem parent item to add category
+     * @param App\Helpers\CategoryMapItem $parentItem parent item to add category
      * @param number $categoryId category id to add
-     * @param CategoryMapItem $tree tree object which contains the root category
+     * @param App\Helpers\CategoryMapItem $tree tree object which contains the root category
      *
      */
     private function addChildToParents($parentItem, $categoryId, $tree)
     {
-        // for direct parent, add the categoryId to the children and recursive children array
-        // add the element id to the parent children ids and recursive parent children ids array
+        // for the direct parent, add the categoryId to the children and recursive children array
         array_push($parentItem->childrenIds, $categoryId);
         array_push($parentItem->recursiveChildrenIds, $categoryId);
         // increment the parent children and recursive children count
@@ -184,122 +199,117 @@ class CategoryMap
 
     // ===================== Categories mapping - END ======================== //
 
+    /**
+     * get categories count
+     *
+     * @return number categories count
+     */
+    public function getCategoriesCount()
+    {
+        return count($this->catListById);
+    }
+
+    /**
+     * get the category item for the given slug
+     *
+     * @param string $slug the slug of the category
+     * @return App\Helpers\CategoryMapItem the category item if found, otherwise null
+     */
     public function getCategoryItemBySlug($slug)
     {
         return isset($this->catListBySlug[$slug]) ? $this->catListBySlug[$slug] : null;
     }
 
+    /**
+     * get the category item for the given id
+     *
+     * @param number $id the id of the category
+     * @return App\Helpers\CategoryMapItem the category item if found, otherwise null
+     */
     public function getCategoryItemById($id)
     {
         return isset($this->catListById[$id]) ? $this->catListById[$id] : null;
     }
 
+    /**
+     * get the tree structure of the categories, except the category (and all it's children and grandchildren) which has the given slug
+     *
+     * @param string $slug the slug of the category
+     * @return App\Helpers\CategoryMapItem the category item if found, otherwise null
+     */
     public function getTreeExceptBySlug($slug)
     {
         $this->getTreeExcept($this->catListBySlug[$slug]->id);
     }
 
-    // returns the tree structure except the given category id and its children
+    /**
+     * get the tree structure of the categories, except the category (and all it's children and grandchildren) which has the given id
+     *
+     * @param string $slug the slug of the category
+     * @return App\Helpers\CategoryMapItem the category item if found, otherwise null
+     */
     public function getTreeExcept($id)
     {
         return $this->getTreeStructureExcept($id);
     }
 
-    // returns the direct children of given category
+    /**
+     * get the direct children of given category id
+     *
+     * @param number $id the category id for which to get the children
+     * @return array direct children of given category
+     */
     public function getCategoryChildrenList($id)
     {
-        if (count($this->arrCategoryIndex) == 0) {
+        $categoryItem = $this->getCategoryItemById($id);
+        if (!$categoryItem || $categoryItem->childrenCount == 0) {
             return null;
         }
 
-        if (!isset($this->arrCategoryIndex[$id])) {
-            return null;
+        $children = array();
+        foreach ($categoryItem->children as $child) {
+            $catItem  = $this->catListById[$child->id];
+            array_push($children, $catItem);
         }
 
-        $row = $this->tree[$this->arrCategoryIndex[$id]]; // get category Item for the given category Id
-
-        if ($row->DirectChildrenCount == 0) {
-            return null;
-        }
-
-        $arrTreeList = array();
-        $arrTreeIds = explode(',', $row->DirectChildrenIds); // get children of the searched category
-        foreach ($arrTreeIds as $catId) {
-            array_push($arrTreeList, $this->tree[$this->arrCategoryIndex[$catId]]);
-        }
-
-        return $arrTreeList;
+        return $children;
     }
 
-    // returns all children of given category, in a tree order
-    // if skipId specified, will not include the category with that id and all it's children
-    // if $includeCategory, it will include the category with $id
-    public function getCategoryTreeRecursive($id, $skipId = null, $includeCategory = false)
-    {
-        $arrTreeList = array();
-        if (count($this->tree) === 0) {
-            return $arrTreeList;
-        }
-        // dd($this->treeCategories);
-        if ($this->tree) {
-            if ($includeCategory) {
-                $row = $this->tree[$this->arrCategoryIndex[$id]]; // get category Item for the given category Id
-                array_push($arrTreeList, $row);
-            }
-        }
-
-        $this->GetChildrenRecursive($id, $arrTreeList, $skipId);
-
-        return $arrTreeList;
-    }
-
-    // returns all children of given category, in a tree order
-    public function getChildrenRecursive($id, &$arrTreeList, $skipId = null)
-    {
-        $row = $this->treeCategories[$this->arrCategoryIndex[$id]]; // get category Item for the given category Id
-        if ($row->DirectChildrenCount == 0) {
-            return;
-        }
-
-        $arrTreeIds = explode(',', $row->DirectChildrenIds); // get children of the searched category
-
-        foreach ($arrTreeIds as $catId) {
-            $row = $this->treeCategories[$this->arrCategoryIndex[$catId]];
-            $row->parentRef = null;
-            if ($skipId !== null && $row->id === $skipId) {
-                continue;
-            }
-
-            array_push($arrTreeList, $row);
-            if ($row->DirectChildrenCount > 0) {
-                $this->GetChildrenRecursive($row->id, $arrTreeList, $skipId);
-            }
-
-        }
-    }
-
+    /**
+     * get parent and ancestors of given category
+     *
+     * @param number $id the category id for which to get the parent and ancestors
+     * @return array list with parent and ancestors
+     */
     public function getCategoryParents($id)
     {
-        $arrItems = array();
-        $itemsCount = 0;
-
+        $parentList = array();
         $categoryItem = $this->getCategoryItemById($id);
+
+        $parentLevel = 0;
         while ($categoryItem != null) {
-            $arrItems[$itemsCount] = $categoryItem;
-            $categoryItem = $categoryItem->parentRef;
-            $itemsCount++;
+            $parentList[$parentLevel] = $categoryItem;
+            $categoryItem = $this->getCategoryItemById($categoryItem->parent_id);
+            $parentLevel++;
         }
 
-        return $arrItems;
+        return $parentList;
     }
 
+     /**
+     * get parent at specified level
+     *
+     * @param number $id the category id for which to get the parent
+     * @param number $level the level of the parent to get
+     * @return App\Helpers\CategoryMapItem the parent category at specified level, if found
+     */
     public function getParentAtLevel($id, $level)
     {
         $categoryItem = $this->getCategoryItemById($id);
         $parentItem = null;
         while ($categoryItem != null) {
-            $categoryItem = $categoryItem->parentRef;
-            if ($categoryItem->level == $level) {
+            $categoryItem = $this->getCategoryItemById($categoryItem->parent_id);
+            if ($categoryItem && $categoryItem->level == $level) {
                 $parentItem = $categoryItem;
                 break;
             }
@@ -308,35 +318,33 @@ class CategoryMap
         return $parentItem;
     }
 
+    /**
+     * get categories as JSON
+     *
+     * @return string categories as JSON
+     */
     public function getCategoriesAsJson()
     {
         return json_encode($this->catListById);
     }
 
+    /**
+     * read categories from a JSON string and create the tree structure
+     */
     public function readCategoriesFromJson($jsonContent)
     {
-        $arrCategories = json_decode($jsonContent);
-        $this->treeCategories = array();
-        foreach ($arrCategories as $category) {
-            $newCat = new CategoryMapItem($category);
-            $this->copyObjectAttributes($category, $newCat);
-            array_push($this->treeCategories, $newCat);
-
-            // rebuild indexes
-            $this->arrCategoryIndex[$category->id] = $category;
-            $this->catListBySlug[$category->slug] = $category;
+        $categories = json_decode($jsonContent);
+        if ($categories) {
+            $this->mapCategories($categories);
         }
     }
 
-
-    private function copyObjectAttributes(&$objSrc, &$objDest)
-    {
-        foreach (get_object_vars($objSrc) as $key => $value) {
-            $objDest->{$key} = $value;
-        }
-    }
-
-    // get the max order index from the children of the given category id and add 1 to it
+    /**
+     * get the max order index from the children of the given category id and add 1 to it
+     *
+     * @param number $categoryId the category id for which to calculate next order index
+     * @return number the next available order index
+     */
     public function getChildrenNextOrderIndex($categoryId)
     {
         $orderIndex = 0;
@@ -351,47 +359,13 @@ class CategoryMap
         }
         return $orderIndex;
     }
-}
 
-class CategoryMapItemBase
-{
-    // attributes from database
-    public $id;
-    public $parent_id;
-    public $name;
-    public $slug;
-    public $order_index;
-    public $children;
-
-    public function __construct($category)
+    /**
+     * get category list
+     *
+     */
+    public function getCategoryList()
     {
-        $this->id = $category->id;
-        $this->parent_id = $category->parent_id;
-        $this->name = $category->name;
-        $this->slug = $category->slug;
-        $this->order_index = $category->order_index;
-
-        $this->children = array();
-    }
-}
-
-class CategoryMapItem extends CategoryMapItemBase
-{
-    // attributes for faster access - camel cased, as opposed to the ones from database
-    public $childrenCount;
-    public $childrenIds;
-    public $recursiveChildrenCount;
-    public $recursiveChildrenIds;
-    public $level;
-
-    public function __construct($category)
-    {
-        parent::__construct($category);
-
-        $this->childrenCount = 0;
-        $this->childrenIds = array();
-        $this->recursiveChildrenCount = 0;
-        $this->recursiveChildrenIds = array();
-        $this->level = 0;
+        return $this->catListById;
     }
 }

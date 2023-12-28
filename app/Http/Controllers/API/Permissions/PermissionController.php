@@ -6,7 +6,6 @@ use App\Enums\HttpCode;
 use App\Helpers\ArrayUtils;
 use App\Helpers\ExportUtils;
 use App\Helpers\Form;
-use App\Models\Permission;
 use App\Http\Controllers\API\BaseController;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -40,15 +39,16 @@ class PermissionController extends BaseController
      * get permission list
      *
      * @param \Illuminate\Http\Request $request user request
-     * @return array list with permissions
+     * @return \Illuminate\Http\JsonResponse response which contains the list with permissions
      */
     public function list(Request $request)
     {
         $query = $this->model::select($this->selectFields);
         $query = $this->applyFilters($query, $request);
 
+        $dataCount = $query->count();
         $data = $query->get()->toArray();
-        return $data;
+        return $this->sendResponse($data, HttpCode::OK, ['totalCount' => $dataCount]);
     }
 
     /**
@@ -82,50 +82,52 @@ class PermissionController extends BaseController
      * store permission to database -> create new entry
      *
      * @param \Illuminate\Http\Request $request user request
-     * @return \Illuminate\Http\JsonResponse a json response, which specifies if the entity was created or not
+     * @return \Illuminate\Http\JsonResponse a json response, with the created entry, or error if validation fails
      */
     public function store(Request $request)
     {
         $validator = $this->validateItemRequest($request);
         if ($validator->failed) {
-            return $this->sendError('Validation Error.', $validator->errors, HttpCode::BadRequest);
+            return $this->sendError([$validator->errors], HttpCode::BadRequest);
         }
         $response = $this->createItem($request);
-        return $this->sendResponse($response, 'Permission created successfully.', HttpCode::Created);
+        return $this->sendResponse($response, HttpCode::Created);
     }
 
     /**
      * permission get item
      *
      * @param number $id product id
-     * @return \Illuminate\Http\JsonResponse a json response, which specifies if the entity was created or not
+     * @return \Illuminate\Http\JsonResponse a json response, with the entity if found, otherwise will throw a 404 not found
      */
     public function getItem($id)
     {
         $data = $this->getItemForEdit($id);
-        return $this->sendResponse($data, null);
+        return $this->sendResponse($data);
     }
 
     /**
      * update permission in database
-     * @param \Illuminate\Http\Request $request http request
+     *
+     * @param \Illuminate\Http\Request $request user request
      * @param number $id permission id to update
-     * @return object json with updated permission
+     * @return \Illuminate\Http\JsonResponse a json response with the updated permission or a Bad request with errors, if failed
      */
     public function update(Request $request, $id)
     {
         $validator = $this->validateItemRequest($request, $id);
         if ($validator->failed) {
-            return $this->sendError('Validation Error.', $validator->errors, HttpCode::BadRequest);
+            return $this->sendError([$validator->errors], HttpCode::BadRequest);
         }
         $response = $this->saveItem($request, $id);
-        return $this->sendResponse($response, 'Permission updated successfully.');
+        return $this->sendResponse($response);
     }
 
     /**
      * Delete permission from db
+     *
      * @param number $id permission id
-     * @return object empty response
+     * @return \Illuminate\Http\Response empty response if entity found and deleted, otherwise 404 not found
      */
     public function delete($id)
     {
@@ -140,18 +142,19 @@ class PermissionController extends BaseController
 
     /**
      * Delete permissions from db
+     *
      * @param \Illuminate\Http\Request $request user request, must contain ids as an array of numbers
-     * @return object either empty response if all good or a validation error
+     * @return \Illuminate\Http\Response empty response if request is valid, otherwise a bad request status
      */
     public function deleteSelected(Request $request)
     {
         if (!$request->has('ids')) {
-            return $this->sendError('Validation Error.', null, HttpCode::BadRequest);
+            return $this->sendError(['Validation Error'], HttpCode::BadRequest);
         }
         $ids = json_decode($request->ids, JSON_NUMERIC_CHECK);
         $ids = ArrayUtils::transformToPositiveIntegers($ids);
         if (!$ids) {
-            return $this->sendError('Validation Error.', null, HttpCode::BadRequest);
+            return $this->sendError(['Validation Error'], HttpCode::BadRequest);
         }
         $this->model::whereIn('id', $ids)->delete();
         return $this->sendEmptyResponse(HttpCode::NoContent);
@@ -159,7 +162,9 @@ class PermissionController extends BaseController
 
     /**
      * validate export params
+     *
      * @param \Illuminate\Http\Request $request user request, must contain: export_format
+     * @return boolean true if parameters are valid, false otherwise
      */
     private function validateExport(Request $request)
     {
@@ -170,15 +175,15 @@ class PermissionController extends BaseController
     }
 
     /**
-     * export all permissions
+     * export selected data
      *
-     * @param \Illuminate\Http\Request $request http request, must contain: export_format
-     * @return \Illuminate\Http\Response containing the exported data
+     * @param \Illuminate\Http\Request $request user request, must contain: export_format
+     * @return \Illuminate\Http\Response containing the exported data or a bad request if request not valid
      */
     public function export(Request $request)
     {
         if (!$this->validateExport($request)) {
-            return $this->sendError('Validation Error.', null, HttpCode::BadRequest);
+            return $this->sendError(['Validation Error.'], HttpCode::BadRequest);
         }
         $data = $this->getExportData($request);
         $fileName = $this->exportFileName . '-' . date('Y-m-d');
@@ -205,7 +210,7 @@ class PermissionController extends BaseController
      * get permission item for edit; throws a 404 not found exception if item not found in database
      *
      * @param number $itemId permission id
-     * @return object permission model
+     * @return \app\Models\Permission permission model
      */
     private function getItemForEdit($itemId)
     {
@@ -218,7 +223,7 @@ class PermissionController extends BaseController
     /**
      * get data for export from db, for the given request
      *
-     * @param \Illuminate\Http\Request $request http request
+     * @param \Illuminate\Http\Request $request user request
      * @return array a list with all permissions
      */
     private function getExportData(Request $request)
@@ -270,7 +275,7 @@ class PermissionController extends BaseController
      * save new permission in database, from provided request
      *
      * @param \Illuminate\Http\Request $request user request
-     * @return object the created entity
+     * @return \app\Models\Permission the created entity
      */
     private function createItem(Request $request)
     {
@@ -285,7 +290,7 @@ class PermissionController extends BaseController
      *
      * @param \Illuminate\Http\Request $request user request
      * @param number $itemId id of the permission to save
-     * @return object the updated entity
+     * @return \app\Models\Permission the updated entity
      */
     private function saveItem(Request $request, $itemId)
     {

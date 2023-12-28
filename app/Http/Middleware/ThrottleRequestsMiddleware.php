@@ -59,7 +59,7 @@ class ThrottleRequestsMiddleware extends ThrottleRequests
             $retryAfter
         );
 
-        $responseData = ['message' => 'Too many attempts', 'maxAttempts' => $maxAttempts, 'retryAfter' => $retryAfter];
+        $responseData = ['errors' => ['Too many attempts'], 'maxAttempts' => $maxAttempts, 'retryAfter' => $retryAfter];
         $response = response()->json($responseData, 429);
         foreach ($headers as $key => $value) {
             $response->header($key, $value);

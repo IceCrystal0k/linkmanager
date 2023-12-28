@@ -1,0 +1,395 @@
+<html>
+
+<head>
+    <title>Link manager</title>
+    <link rel="stylesheet" href="./css/main.css">
+</head>
+
+<body>
+    <div class="page-wrapper">
+        <div class="header">
+            <h1>Link manager</h1>
+            <hr>
+        </div>
+        <div class="content">
+            <div class="short-description">
+                <h3>Project short description</h3>
+                An application which organize web links in different categories and subcategories.
+
+                <h4>Technology</h4>
+                <ol>
+                    <li>api in PHP - Laravel (see F:\laragon\www\calories)</li>
+                    <li>front in react (see F:\toptal\Uta-Cirstea-Adrian-Vasile)</li>
+                </ol>
+            </div>
+            <div class="references">
+                <h3>References</h3>
+                <ol>
+                    <li><a href="https://www.xrayz.co.uk/linkstash/screenshots?shot=main" target="_blank">Link stash</a>
+                    </li>
+                    <li><a href="https://www.codesolutionstuff.com/laravel-9-install-react-auth-tutorial-with-example/"
+                            target="_blank">Laravel 9 and React auth - Codesolution</a></li>
+                    <li><a href="https://www.tutsmake.com/laravel-9-react-auth-tutorial-with-example/"
+                            target="_blank">Laravel 9 and React auth - Tutsmake</a></li>
+                    <li><a href="https://www.itsolutionstuff.com/post/laravel-9-rest-api-authentication-using-sanctum-tutorialexample.html"
+                            target="_blank">Laravel 9 and React auth - ITSolutions</a></li>
+                    <li><a href="https://dev.to/emokores256/integrate-reactjs-into-laravel-9-bl2"
+                            target="_blank">Laravel 9 and React auth - Dev.To</a></li>
+                    <li><a href="https://blixtdev.com/you-dont-need-webpack-3-better-alternatives-for-building-your-javascript/"
+                            target="_blank">Webpack alternatives</a></li>
+                    <li><a href="https://blog.openreplay.com/top-five-alternatives-to-webpack/" target="_blank">Webpack
+                            alternatives - Top 5</a></li>
+                    <li><a href="https://vitejs.dev/" target="_blank">Vite JS</a></li>
+                    <li><a href="https://inertiajs.com/pages" target="_blank">inertiajs</a></li>
+                    <li><a href="https://gmail.com" target="_blank">GMail - see categories &amp; subcategories from
+                            labels</a></li>
+                </ol>
+            </div>
+
+            <div class="detailed-description">
+                <h3>Detailed description</h3>
+                <ol>
+                    <li>
+                        <div class="section-title">Backend API</div>
+                        <div class="section-description">
+                            Create an API project using Laravel and sanctum
+                        </div>
+                        <ol>
+                            <li>
+                                <div class="section-title">Install Laravel &amp; sanctum </div>
+                                <ul>
+                                    <li class="completed"><a
+                                            href="https://laravel.com/docs/10.x/installation#your-first-laravel-project"
+                                            target="_blank">Install Laravel</a></li>
+                                    <li class="completed"><a
+                                            href="https://www.itsolutionstuff.com/post/laravel-9-rest-api-authentication-using-sanctum-tutorialexample.html">Install
+                                            and configure sanctum</a></li>
+                                </ul>
+                            </li>
+                            <li>
+                                <div class="section-title">Create the tables db structure</div>
+                                <div class="section-description">Use: <code
+                                        class="terminal-command">php artisan create:migration</code>. See <a
+                                        href="https://laravel.com/docs/10.x/migrations#creating-tables"
+                                        target="_blank">Laravel Database Migrations</a></div>
+                                <ul>
+                                    <li class="completed">permissions : id, name, slug, timestamps</li>
+                                    <li class="completed">roles : id, name, slug, timestamps</li>
+                                    <li class="completed">users_roles: user_id, role_id</li>
+                                    <li class="completed">roles_permissions: role_id, permission_id</li>
+                                    <li class="completed">categories: id, parent_id, name, slug, order_index, depth,
+                                        description, children_count, direct_children_count, timestamps</li>
+                                    <li class="completed">users_info: id, user_id, avatar, timezone, date_format,
+                                        date_format_separator, timestamps</li>
+                                    <li class="completed">links : id, category_id, url, description, comment, rating,
+                                        visits, last_verified_at, verification_status, username, password, auth_info,
+                                        timestamps</li>
+                                    <li class="completed">tags : id, name, timestamps</li>
+                                    <li class="completed">links_tags : link_id, tag_id</li>
+                                </ul>
+                            </li>
+                            <li>
+                                <div class="section-title completed">Migrate the database</div>
+                                <ul>
+                                    <li class="completed">Run : <code
+                                            class="terminal-command">php artisan migrate</code>.<br />
+                                        Or use: <code class="terminal-command">php artisan migrate:fresh</code> to drop
+                                        all tables from the database and then execute the migrate command.
+                                    </li>
+                                </ul>
+                            </li>
+                            <li>
+                                <div class="section-title">Create the models</div>
+                                <ul>
+                                    <li class="completed">Permission</li>
+                                    <li class="completed">Role</li>
+                                    <li class="completed">RolesPermission</li>
+                                    <li class="completed">Category</li>
+                                    <li class="completed">User</li>
+                                    <li class="completed">Tag</li>
+                                    <li class="completed">Link</li>
+                                    <li class="completed">LinksTag</li>
+                                </ul>
+                            </li>
+                            <li>
+                                <div class="section-title">Create the routes</div>
+                                <ul>
+                                    <li class="completed">sessions : [post] -> Login, [delete] -> logout</li>
+                                    <li class="completed">accounts : [post] -> Register, [delete] -> remove account,
+                                        [get] -> get current
+                                        account data, [put] -> update account, [patch] -> partial update (for password)
+                                    </li>
+                                    <li class="completed">accounts/emails : [post] -> if action is reset-password : send
+                                        an email to the
+                                        given email to reset the password</li>
+                                    <li class="completed">accounts/passwords: [post] -> reset the password</li>
+                                    <li class="completed">permissions : [get] -> get the list, [post] -> create, [put]
+                                        -> update, [delete]
+                                        -> delete</li>
+                                    <li class="completed">roles : [get] -> get the list, [post] -> create, [put] ->
+                                        update, [delete] ->
+                                        delete</li>
+                                    <li class="completed">roles/id/permissions: [get] -> get the list, [post] -> create,
+                                        [delete] -> delete</li>
+                                    <li class="completed">categories : [get] -> get the list, [post] -> create, [put] ->
+                                        update, [delete]
+                                        -> delete</li>
+                                    <li class="completed">users : [get] -> get the list, [post] -> create, [put] ->
+                                        update, [delete] ->
+                                        delete</li>
+                                    <li class="completed">users/id/roles : [get] -> get the list, [post] -> create,
+                                        [delete] -> delete</li>
+                                    <li class="completed">users/id/permissions : [get] -> get the list, [post] ->
+                                        create, [delete] -> delete</li>
+                                    <li class="completed">tags : [get] -> get the list, [post] -> create, [put] ->
+                                        update, [delete] ->
+                                        delete</li>
+                                    <li class="completed">links : [get] -> get the list, [post] -> create, [put] ->
+                                        update, [delete] ->
+                                        delete</li>
+                                </ul>
+                            </li>
+                            <li>
+                                <div class="section-title">Create the controllers (just the structure)</div>
+                                <ul>
+                                    <li class="completed">AuthController: handle Login, Logout</li>
+                                    <li class="completed">AccountController: handle Register, Remove account, Get
+                                        current
+                                        account data, Update account, Partial update (for password), Send email for
+                                        password Reset,
+                                        Reset password
+                                    </li>
+                                    <li class="completed">PermissionController : handle permission list, create, edit,
+                                        delete </li>
+                                    <li class="completed">RoleController : handle role list, create, edit, delete </li>
+                                    <li class="completed">RolePermissionsController : handle role permissions list,
+                                        create, edit, delete</li>
+                                    <li class="completed">CategoryController : handle category list, create, edit,
+                                        delete</li>
+                                    <li class="completed">UserController : handle user list, create, edit, delete</li>
+                                    <li class="completed">UserRolesController : handle user roles list, update</li>
+                                    <li class="completed">UserPermissionsController : handle user permissions list,
+                                        create, edit, delete</li>
+                                    <li class="completed">TagController : handle tags list, create, edit, delete</li>
+                                    <li class="completed">LinkController : handle links list, create, edit, delete</li>
+                                </ul>
+                            </li>
+                            <li>
+                                <div class="section-title">Verify the routes with Postman</div>
+                                <ul>
+                                    <li class="completed">sessions</li>
+                                    <li class="completed">accounts</li>
+                                    <li class="completed">permissions</li>
+                                    <li class="completed">roles</li>
+                                    <li class="completed">roles/id/permissions</li>
+                                    <li class="completed">categories</li>
+                                    <li class="completed">users</li>
+                                    <li class="completed">users/id/roles</li>
+                                    <li class="completed">users/id/permissions</li>
+                                    <li class="completed">tags</li>
+                                    <li class="completed">links</li>
+                                </ul>
+                            </li>
+                            <li>
+                                <div class="section-title">Implement the functionality in the controllers</div>
+                                <ul>
+                                    <li class="completed">AuthController
+                                        <ul>
+                                            <li class="completed">Login</li>
+                                            <li class="completed">Logout</li>
+                                        </ul>
+                                    </li>
+                                    <li class="completed">AccountController:
+                                        <ul>
+                                            <li class="completed">register</li>
+                                            <li class="completed">send verification email</li>
+                                            <li class="completed">complete account verification (from email link)</li>
+                                            <li class="completed">Send Remove account email</li>
+                                            <li class="completed">Remove account</li>
+                                            <li class="completed">Get current account data</li>
+                                            <li class="completed">Update account</li>
+                                            <li class="completed">Partial update (for password)</li>
+                                            <li class="completed">Send email for password Reset</li>
+                                            <li class="completed">Get email info for a password Reset token</li>
+                                            <li class="completed">Reset password</li>
+                                        </ul>
+                                    </li>
+                                    <li class="completed">PermissionController :
+                                        <ul>
+                                            <li class="completed">list</li>
+                                            <li class="completed">create</li>
+                                            <li class="completed">get</li>
+                                            <li class="completed">update</li>
+                                            <li class="completed">delete</li>
+                                            <li class="completed">delete selected</li>
+                                            <li class="completed">export</li>
+                                        </ul>
+                                    </li>
+                                    <li class="completed">RoleController :
+                                        <ul>
+                                            <li class="completed">list</li>
+                                            <li class="completed">create</li>
+                                            <li class="completed">get</li>
+                                            <li class="completed">update</li>
+                                            <li class="completed">delete</li>
+                                            <li class="completed">delete selected</li>
+                                            <li class="completed">export</li>
+                                        </ul>
+                                    </li>
+                                    <li class="completed">RolePermissionsController :
+                                        <ul>
+                                            <li class="completed">list</li>
+                                            <li class="completed">update</li>
+                                            <li class="completed">export</li>
+                                        </ul>
+                                    </li>
+                                    <li class="completed">CategoryController :
+                                        <ul>
+                                            <li class="completed">list</li>
+                                            <ul>
+                                                <li class="completed">Category mapping class</li>
+                                            </ul>
+                                    </li>
+                                    <li class="completed">create</li>
+                                    <li class="completed">get</li>
+                                    <li class="completed">update</li>
+                                    <li class="completed">delete</li>
+                                    <li class="completed">delete selected</li>
+                                    <li class="completed">export</li>
+                                </ul>
+                            </li>
+                            <li class="completed">UserController :
+                                <ul>
+                                    <li class="completed">list</li>
+                                    <li class="completed">create</li>
+                                    <li class="completed">get</li>
+                                    <li class="completed">update</li>
+                                    <li class="completed">delete</li>
+                                    <li class="completed">delete selected</li>
+                                    <li class="completed">export</li>
+                                </ul>
+                            </li>
+                            <li class="completed">UserPermissionsController :
+                                <ul>
+                                    <li class="completed">list</li>
+                                    <li class="completed">update</li>
+                                    <li class="completed">export</li>
+                                </ul>
+                            </li>
+                            <li class="completed">TagController :
+                                <ul>
+                                    <li class="completed">list</li>
+                                    <li class="completed">create</li>
+                                    <li class="completed">get</li>
+                                    <li class="completed">update</li>
+                                    <li class="completed">delete</li>
+                                    <li class="completed">delete selected</li>
+                                    <li class="completed">export</li>
+                                </ul>
+                            </li>
+                            <li class="completed">LinkController :
+                                <ul>
+                                    <li class="completed">list</li>
+                                    <li class="completed">create</li>
+                                    <li class="completed">get</li>
+                                    <li class="completed">update</li>
+                                    <li class="completed">delete</li>
+                                    <li class="completed">delete selected</li>
+                                    <li class="completed">export</li>
+                                </ul>
+                            </li>
+                            </ul>
+                    </li>
+                    <li>
+                        <div class="section-title">Verify the functionality of the controllers with Postman</div>
+                        <ul>
+                            <li class="completed">sessions</li>
+                            <li class="completed">accounts</li>
+                            <li class="completed">accounts/requests</li>
+                            <li class="completed">permissions</li>
+                            <li class="completed">roles</li>
+                            <li class="completed">roles/id/permissions</li>
+                            <li class="completed">categories</li>
+                            <li class="completed">users</li>
+                            <li class="completed">users/id/roles</li>
+                            <li class="completed">users/id/permissions</li>
+                            <li class="completed">tags</li>
+                            <li class="completed">links</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <div class="section-title">Review the code of the controllers and comment each function, test
+                            with postman if any change made</div>
+                        <ul>
+                            <li class="completed">sessions</li>
+                            <li class="completed">accounts</li>
+                            <li class="completed">accounts/requests</li>
+                            <li class="completed">permissions</li>
+                            <li class="completed">roles</li>
+                            <li class="completed">roles/id/permissions</li>
+                            <li class="completed">categories</li>
+                            <li class="completed">users</li>
+                            <li class="completed">users/id/roles</li>
+                            <li class="completed">users/id/permissions</li>
+                            <li class="completed">tags</li>
+                            <li class="completed">links</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <div class="section-title">Write unit tests fort the endpoints</div>
+                        <ul>
+                            <li class="completed">sessions</li>
+                            <li>accounts</li>
+                            <li>accounts/requests</li>
+                            <li>permissions</li>
+                            <li>roles</li>
+                            <li>roles/id/permissions</li>
+                            <li>categories</li>
+                            <li>users</li>
+                            <li>users/id/roles</li>
+                            <li>users/id/permissions</li>
+                            <li>tags</li>
+                            <li>links</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <div class="section-title">Updates and bug fixing, test with postman if any change made</div>
+                        <ul>
+                            <li></li>
+                        </ul>
+                    </li>
+                </ol>
+                </li>
+                </ol>
+            </div>
+
+            <div class="other-description">
+                <h3>Other info</h3>
+                <ol>
+                    <li class="completed">see if can be used <a href="./tree_from_list.html">Tree from list</a></li>
+                    <li class="completed">see if is feasible to add all fields from CategoryMap in db ( for add / move /
+                        delete category
+                        -> recalculate DirectChildrenIds, DirectChildrenCount, RecursiveChildrenIds,
+                        RecursiveChildrenCount, ArticlesCount) <br />
+                        Conclusion :: to keep these fields updated in database, it adds a lot of complexity, especially
+                        when when moving or deleting a category.
+                        For example, after a category is moved, all recursive children count and ids needs to be
+                        recalculated for the source category and all of its parents
+                        and also for the destination parent parent and all of its parents, and then update all these
+                        changes in database.
+                        Since the computation of this info is anyway made in the CategoryMap, there's no reason to add
+                        them to the database.
+                    </li>
+                    <li>When a user registers / is created, create for it some default categories in the db</li>
+                </ol>
+            </div>
+        </div>
+        <div class="footer">
+            <h3>Desired date to complete: 15.12.2023</h3> (Actually forgot about this but guess what ... see below)
+            <h2>Actual complete date: 15.12.2023</h2> (without the code review and comment of each function)
+        </div>
+    </div>
+    <script type="text/javascript" src="./js/main.js"></script>
+</body>
+
+</html>

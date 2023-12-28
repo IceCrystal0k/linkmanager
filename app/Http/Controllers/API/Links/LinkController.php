@@ -41,15 +41,18 @@ class LinkController extends BaseController
 
     /**
      * get link list
+     *
      * @param \Illuminate\Http\Request $request user request
-     * @return array list with links
+     * @return \Illuminate\Http\JsonResponse response which contains the list with links
      */
-    public function list(Request $request) {
+    public function list(Request $request)
+    {
         $query = $this->model::select($this->selectFields);
         $query = $this->applyFilters($query, $request);
 
+        $dataCount = $query->count();
         $data = $query->get()->toArray();
-        return $data;
+        return $this->sendResponse($data, HttpCode::OK, ['totalCount' => $dataCount]);
     }
 
     /**
@@ -127,45 +130,46 @@ class LinkController extends BaseController
     {
         $validator = $this->validateItemRequest($request);
         if ($validator->failed) {
-            return $this->sendError('Validation Error.', $validator->errors, HttpCode::BadRequest);
+            return $this->sendError([$validator->errors], HttpCode::BadRequest);
         }
-        $item = $this->createItem($request);
-        return $this->sendResponse($item, 'Link created successfully', HttpCode::Created);
+        $response = $this->createItem($request);
+        return $this->sendResponse($response, HttpCode::Created);
     }
 
     /**
      * link get item
      *
      * @param number $id product id
-     * @return \Illuminate\Http\JsonResponse a json response, which specifies if the entity was created or not
+     * @return \Illuminate\Http\JsonResponse a json response, with the entity if found, otherwise throws a 404 not found
      */
     public function getItem($id)
     {
         $data = $this->getItemForEdit($id);
-        return $this->sendResponse($data, null);
+        return $this->sendResponse($data);
     }
 
     /**
      * update link in database
-     * @param {object} $request http request
-     * @param {number} $id link id to update
-     * @return {view} edit view
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @param number $id link id to update
+     * @return \Illuminate\Http\JsonResponse a json response with the updated link or a Bad request with errors, if failed
      */
     public function update(Request $request, $id)
     {
         $validator = $this->validateItemRequest($request, $id);
         if ($validator->failed) {
-            return $this->sendError('Validation Error.', $validator->errors, HttpCode::BadRequest);
+            return $this->sendError([$validator->errors], HttpCode::BadRequest);
         }
         $response = $this->saveItem($request, $id);
-        return $this->sendResponse($response, 'Link updated successfully.');
+        return $this->sendResponse($response);
     }
 
     /**
      * Delete link from db
      *
      * @param number $id link id
-     * @return \Illuminate\Http\Response an empty response, if the entity was deleted or 404 not found if the entity was not found
+     * @return \Illuminate\Http\Response empty response if entity found and deleted, otherwise 404 not found
      */
     public function delete($id)
     {
@@ -182,17 +186,17 @@ class LinkController extends BaseController
      * Delete links from db
      *
      * @param \Illuminate\Http\Request $request user request, must contain ids as an array of numbers
-     * @return object either empty response if all good or a validation error
+     * @return \Illuminate\Http\Response empty response if request is valid, otherwise a bad request status
      */
     public function deleteSelected(Request $request)
     {
         if (!$request->has('ids')) {
-            return $this->sendError('Validation Error.', null, HttpCode::BadRequest);
+            return $this->sendError(['Validation Error'], HttpCode::BadRequest);
         }
         $ids = json_decode($request->ids, JSON_NUMERIC_CHECK);
         $ids = ArrayUtils::transformToPositiveIntegers($ids);
         if (!$ids) {
-            return $this->sendError('Validation Error.', null, HttpCode::BadRequest);
+            return $this->sendError(['Validation Error'], HttpCode::BadRequest);
         }
         $this->model::whereIn('id', $ids)->delete();
         return $this->sendEmptyResponse(HttpCode::NoContent);
@@ -200,7 +204,9 @@ class LinkController extends BaseController
 
     /**
      * validate export params
+     *
      * @param \Illuminate\Http\Request $request user request, must contain: export_format
+     * @return boolean true if parameters are valid, false otherwise
      */
     private function validateExport(Request $request)
     {
@@ -211,7 +217,7 @@ class LinkController extends BaseController
     }
 
     /**
-     * export all permissions
+     * export selected data
      *
      * @param \Illuminate\Http\Request $request http request, must contain: export_format
      * @return \Illuminate\Http\Response containing the exported data
@@ -219,7 +225,7 @@ class LinkController extends BaseController
     public function export(Request $request)
     {
         if (!$this->validateExport($request)) {
-            return $this->sendError('Validation Error.', null, HttpCode::BadRequest);
+            return $this->sendError(['Validation Error.'], HttpCode::BadRequest);
         }
         $data = $this->getExportData($request);
         $fileName = $this->exportFileName . '-' . date('Y-m-d');
@@ -243,9 +249,10 @@ class LinkController extends BaseController
     }
 
     /**
-     * get link item for edit
-     * @param {number} $itemId link id
-     * @return {object} link model
+     * get link item for edit; throws a 404 not found exception if item not found in database
+     *
+     * @param number $itemId link id
+     * @return \app\Models\Link link model
      */
     private function getItemForEdit($itemId)
     {
@@ -257,8 +264,9 @@ class LinkController extends BaseController
 
     /**
      * get data for export from db, for the given request
-     * @param {object} $request http request
-     * @return {array} of link models
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @return array a list with all links
      */
     private function getExportData(Request $request)
     {
@@ -303,8 +311,9 @@ class LinkController extends BaseController
 
     /**
      * get the csv content for the given data
-     * @param {array} $data array of role models
-     * @return {string} csv content for provided data
+     *
+     * @param array $data array of role models
+     * @return string csv content for provided data
      */
     private function getCsvContent($data)
     {
@@ -320,7 +329,7 @@ class LinkController extends BaseController
      * validate item request before create / save
      *
      * @param \Illuminate\Http\Request $request user request
-     * @param number $id permission id
+     * @param number $id link id
      * @return object an object with the fields { failed, errors }
      */
     private function validateItemRequest(Request $request, $id = null)
@@ -346,9 +355,10 @@ class LinkController extends BaseController
     }
 
     /**
-     * save new role in database, from provided request
-     * @param {object} $request http request
-     * @return {number} created id
+     * save new link in database, from provided request
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @return \app\Models\Link the created entity
      */
     private function createItem(Request $request)
     {
@@ -363,7 +373,7 @@ class LinkController extends BaseController
      *
      * @param \Illuminate\Http\Request $request user request
      * @param number $itemId id of the link to save
-     * @return object the updated entity
+     * @return \app\Models\Link the updated entity
      */
     private function saveItem(Request $request, $itemId)
     {

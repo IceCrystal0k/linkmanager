@@ -16,7 +16,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
  */
 class RoleController extends BaseController
 {
-    protected $routePath = 'roles';
+    protected $exportFileName = 'roles';
     protected $translationPrefix = 'role.';
     protected $model = 'App\Models\Role';
     private $updateFields; // fields that will be updated on save
@@ -37,17 +37,19 @@ class RoleController extends BaseController
     }
 
     /**
-     * permission list for datatable (ajax call)
-     * @param {object} $request http request
-     * @return {array} array with data for table
+     * get role list
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @return \Illuminate\Http\JsonResponse response which contains the list with roles
      */
     public function list(Request $request)
     {
         $query = $this->model::select($this->selectFields);
         $query = $this->applyFilters($query, $request);
 
+        $dataCount = $query->count();
         $data = $query->get()->toArray();
-        return $data;
+        return $this->sendResponse($data, HttpCode::OK, ['totalCount' => $dataCount]);
     }
 
      /**
@@ -80,50 +82,54 @@ class RoleController extends BaseController
 
     /**
      * store role to database -> create new entry
-     * @param {object} $request http request
-     * @return {view} edit view
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @return \Illuminate\Http\JsonResponse a json response, with the created entry, or error if validation fails
      */
     public function store(Request $request)
     {
         $validator = $this->validateItemRequest($request);
         if ($validator->failed) {
-            return $this->sendError('Validation Error.', $validator->errors, HttpCode::BadRequest);
+            return $this->sendError([$validator->errors], HttpCode::BadRequest);
         }
         $response = $this->createItem($request);
-        return $this->sendResponse($response, 'Role created successfully.', HttpCode::Created);
+        return $this->sendResponse($response, HttpCode::Created);
     }
 
     /**
-     * role get item; throws a 404 not found exception if item not found in database
+     * role get item
+     *
      * @param {number} $id product id
-     * @return \Illuminate\Http\JsonResponse a json response, with the role model
+     * @return \Illuminate\Http\JsonResponse a json response, with the entity if found, otherwise throw a 404 not found
      */
     public function getItem($id)
     {
         $data = $this->getItemForEdit($id);
-        return $this->sendResponse($data, null);
+        return $this->sendResponse($data);
     }
 
     /**
      * update role in database
-     * @param {object} $request http request
+     *
+     * @param \Illuminate\Http\Request $request user request
      * @param {number} $id role id to update
-     * @return {view} edit view
+     * @return \Illuminate\Http\JsonResponse a json response with the updated role or a Bad request with errors, if failed
      */
     public function update(Request $request, $id)
     {
         $validator = $this->validateItemRequest($request, $id);
         if ($validator->failed) {
-            return $this->sendError('Validation Error.', $validator->errors, HttpCode::BadRequest);
+            return $this->sendError([$validator->errors], HttpCode::BadRequest);
         }
         $response = $this->saveItem($request, $id);
-        return $this->sendResponse($response, 'Role updated successfully.');
+        return $this->sendResponse($response);
     }
 
     /**
      * Delete role from db
-     * @param {number} $id role id
-     * @return {view} list view
+     *
+     * @param number $id role id
+     * @return \Illuminate\Http\Response empty response if role found and deleted, otherwise 404 not found
      */
     public function delete($id)
     {
@@ -138,23 +144,30 @@ class RoleController extends BaseController
 
     /**
      * Delete roles from db
-     * @param {Request} $request user data, must contain ids as an array of numbers
-     * @return {Response} http response
+     *
+     * @param \Illuminate\Http\Request $request user request, must contain ids as an array of numbers
+     * @return \Illuminate\Http\Response empty response if request is valid, otherwise a bad request status
      */
     public function deleteSelected(Request $request)
     {
         if (!$request->has('ids')) {
-            return $this->sendError('Validation Error.', null, HttpCode::BadRequest);
+            return $this->sendError(['Validation Error'], HttpCode::BadRequest);
         }
         $ids = json_decode($request->ids, JSON_NUMERIC_CHECK);
         $ids = ArrayUtils::transformToPositiveIntegers($ids);
         if (!$ids) {
-            return $this->sendError('Validation Error.', null, HttpCode::BadRequest);
+            return $this->sendError(['Validation Error'], HttpCode::BadRequest);
         }
         $this->model::whereIn('id', $ids)->delete();
         return $this->sendEmptyResponse(HttpCode::NoContent);
     }
 
+    /**
+     * validate export params
+     *
+     * @param \Illuminate\Http\Request $request user request, must contain: export_format
+     * @return boolean true if parameters are valid, false otherwise
+     */
     private function validateExport(Request $request)
     {
         if (!$request->has('export_format')) {
@@ -165,17 +178,18 @@ class RoleController extends BaseController
 
     /**
      * export selected data
-     * @param {object} $request http request
-     * @return \Illuminate\Http\Response
+     *
+     * @param \Illuminate\Http\Request $request user request, must contain: export_format
+     * @return \Illuminate\Http\Response containing the exported data or a bad request if request not valid
      */
     public function export(Request $request)
     {
         if (!$this->validateExport($request)) {
-            return $this->sendError('Validation Error.', null, HttpCode::BadRequest);
+            return $this->sendError(['Validation Error.'], HttpCode::BadRequest);
         }
         $data = $this->getExportData($request);
-        $fileName = $this->routePath . '-' . date('Y-m-d');
-        $exportFormat = $request->has('export_format') ? $request->export_format : null;
+        $fileName = $this->exportFileName . '-' . date('Y-m-d');
+        $exportFormat = $request->export_format;
 
         switch ($exportFormat) {
             case 'csv':
@@ -195,9 +209,10 @@ class RoleController extends BaseController
     }
 
     /**
-     * get role item for edit
+     * get role item for edit; throws a 404 not found exception if item not found in database
+     *
      * @param number $itemId role id
-     * @return object role model
+     * @return \app\Models\Role role model
      */
     private function getItemForEdit($itemId)
     {
@@ -209,8 +224,9 @@ class RoleController extends BaseController
 
     /**
      * get data for export from db, for the given request
-     * @param {object} $request http request
-     * @return {array} of role models
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @return array a list with all roles
      */
     private function getExportData(Request $request)
     {
@@ -220,8 +236,9 @@ class RoleController extends BaseController
 
     /**
      * get the csv content for the given data
-     * @param {array} $data array of role models
-     * @return {string} csv content for provided data
+     *
+     * @param array $data array of role models
+     * @return string csv content for provided data
      */
     private function getCsvContent($data)
     {
@@ -234,9 +251,10 @@ class RoleController extends BaseController
 
     /**
      * validate item request before create / save
-     * uses laravel validation which, in case of error, will redirect to the edit/ create page, with the found errors
-     * @param {object} $request http request
-     * @param {number} $id role id
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @param number $id role id
+     * @return object an object with the fields { failed, errors }
      */
     private function validateItemRequest(Request $request, $id = null)
     {
@@ -259,7 +277,7 @@ class RoleController extends BaseController
      * save new role in database, from provided request
      *
      * @param \Illuminate\Http\Request $request user request
-     * @return object the created entity
+     * @return \app\Models\Role the created entity
      */
     private function createItem(Request $request)
     {
@@ -274,7 +292,7 @@ class RoleController extends BaseController
      *
      * @param \Illuminate\Http\Request $request user request
      * @param number $itemId id of the role to save
-     * @return object the updated entity
+     * @return \app\Models\Role the updated entity
      */
     private function saveItem(Request $request, $itemId)
     {

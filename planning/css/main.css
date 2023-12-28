@@ -1,0 +1,50 @@
+body {
+    margin:0;
+    padding:0;
+}
+
+.page-wrapper {
+    width: 1024px;
+    margin: 0 auto;
+}
+
+.header {
+    padding-top: 20px;
+}
+
+.section-title {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.detailed-description > ol > li {
+    border-bottom: 1px solid #c2c2c2;
+    padding-bottom: 5px;
+    margin-bottom: 5px;
+}
+
+.footer {
+    border-top: 1px solid #c2c2c2;
+    margin-top: 15px;
+    padding-top: 15px;
+}
+
+li.completed {
+    font-weight: bold;
+    color: #00cc00;
+}
+
+li.incomplete {
+    font-weight: bold;
+    color: #fdb5ab;
+}
+
+li.in-progress {
+    font-style: italic;
+    color: #cc7400;
+}
+
+.terminal-command {
+    color: orange;
+    font-style: italic;
+}

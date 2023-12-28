@@ -16,7 +16,6 @@ use App\Models\UserEmailToken;
 use App\Models\UsersRole;
 use App\Models\UsersPermission;
 use App\Models\PersonalAccessToken;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -24,11 +23,10 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class UserController extends BaseController
 {
-    protected $exportFileName = 'permissions';
+    protected $exportFileName = 'users';
     protected $routePath = 'user';
     protected $translationPrefix = 'user.';
     protected $model = 'App\Models\User';
-    private $editFields; // fields that appear in the edit form
     private $updateFields; // fields that will be updated on save
     private $selectFields; // fields that will be updated on save
     private $exportFields; // fields that are selected for export
@@ -37,7 +35,6 @@ class UserController extends BaseController
 
     public function __construct()
     {
-        $this->editFields = ['id', 'first_name', 'last_name', 'email', 'google_id', 'fb_id', 'status'];
         $this->updateFields = ['first_name', 'last_name', ['field' => 'status', 'type' => 'bool']];
         $this->selectFields = ['id', 'first_name', 'last_name', 'email', 'google_id', 'fb_id', 'status'];
         $this->filterFields = ['search', 'first_name', 'last_name', 'email'];
@@ -53,15 +50,16 @@ class UserController extends BaseController
      * get user list
      *
      * @param \Illuminate\Http\Request $request user request
-     * @return array list of users
+     * @return \Illuminate\Http\JsonResponse response which contains the list with users
      */
     public function list(Request $request)
     {
         $query = $this->model::select($this->selectFields);
         $query = $this->applyFilters($query, $request);
 
+        $dataCount = $query->count();
         $data = $query->get()->toArray();
-        return $data;
+        return $this->sendResponse($data, HttpCode::OK, ['totalCount' => $dataCount]);
     }
 
     /**
@@ -102,60 +100,52 @@ class UserController extends BaseController
      * store user to database -> create new entry
      *
      * @param \Illuminate\Http\Request $request user request
-     * @return \Illuminate\Http\JsonResponse a json response, which specifies if the entity was created or not
+     * @return \Illuminate\Http\JsonResponse a json response, with the created entry, or error if validation fails
      */
     public function store(Request $request)
     {
         $validator = $this->validateItemRequest($request);
         if ($validator->failed) {
-            return $this->sendError('Validation Error.', $validator->errors, HttpCode::BadRequest);
+            return $this->sendError([$validator->errors], HttpCode::BadRequest);
         }
         $response = $this->createItem($request);
-        return $this->sendResponse($response, 'User created successfully.', HttpCode::Created);
+        return $this->sendResponse($response, HttpCode::Created);
+    }
+
+    /**
+     * user get item
+     *
+     * @param number $id user id
+     * @return \Illuminate\Http\JsonResponse a json response, with the entity if found, otherwise throws a 404 not found
+     */
+    public function getItem($id)
+    {
+        $data = $this->getItemForEdit($id);
+        return $this->sendResponse($data);
     }
 
      /**
      * update user in database
-     * @param {object} $request http request
-     * @param {number} $id user id to update
-     * @return {view} edit view
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @param number $id user id to update
+     * @return \Illuminate\Http\JsonResponse a json response with the updated user or a Bad request with errors, if failed
      */
     public function update(Request $request, $id)
     {
         $validator = $this->validateItemRequest($request, $id);
         if ($validator->failed) {
-            return $this->sendError('Validation Error.', $validator->errors, HttpCode::BadRequest);
+            return $this->sendError([$validator->errors], HttpCode::BadRequest);
         }
         $response = $this->saveItem($request, $id);
-        return $this->sendResponse($response, 'User updated successfully.');
-    }
-
-    /**
-     * user get item
-     * @param {number} $id category id
-     * @return {view} edit view
-     */
-    public function getItem($id)
-    {
-        $data = $this->getItemForEdit($id);
-        return $this->sendResponse($data, null);
-    }
-
-    /**
-     * get category model from db
-     * @param {number} $itemId category id of the category for which to get the data
-     * @return {object} category model
-     */
-    private function getItemForEdit($itemId)
-    {
-        $data = $this->model::select($this->selectFields)->findOrFail($itemId);
-        return $data;
+        return $this->sendResponse($response);
     }
 
     /**
      * Delete user from db
-     * @param {number} $id user id
-     * @return {object} the deleted user object
+     *
+     * @param number $id user id
+     * @return \Illuminate\Http\Response empty response if user found and deleted, otherwise 404 not found
      */
     public function delete($id)
     {
@@ -170,19 +160,20 @@ class UserController extends BaseController
     }
 
     /**
-     * delete selected users and references from db
-     * @param {object} $request http request
-     * @return {view} list view
+     * Delete selected users and references from db
+     *
+     * @param \Illuminate\Http\Request $request user request, must contain ids as an array of numbers
+     * @return \Illuminate\Http\Response empty response if request is valid, otherwise a bad request status
      */
     public function deleteSelected(Request $request)
     {
         if (!$request->has('ids')) {
-            return $this->sendError('Validation Error.', null, HttpCode::BadRequest);
+            return $this->sendError(['Validation Error'], HttpCode::BadRequest);
         }
         $ids = json_decode($request->ids, JSON_NUMERIC_CHECK);
         $ids = ArrayUtils::transformToPositiveIntegers($ids);
         if (!$ids) {
-            return $this->sendError('Validation Error.', null, HttpCode::BadRequest);
+            return $this->sendError(['Validation Error'], HttpCode::BadRequest);
         }
         $this->deleteUsersEntries($ids);
         $this->model::whereIn('id', $ids)->delete();
@@ -191,7 +182,9 @@ class UserController extends BaseController
 
     /**
      * validate export params
+     *
      * @param \Illuminate\Http\Request $request user request, must contain: export_format
+     * @return boolean true if parameters are valid, false otherwise
      */
     private function validateExport(Request $request)
     {
@@ -203,13 +196,14 @@ class UserController extends BaseController
 
     /**
      * export selected data
-     * @param {object} $request http request
-     * @return \Illuminate\Http\Response
+     *
+     * @param \Illuminate\Http\Request $request user request, must contain: export_format
+     * @return \Illuminate\Http\Response containing the exported data or a bad request if request not valid
      */
     public function export(Request $request)
     {
         if (!$this->validateExport($request)) {
-            return $this->sendError('Validation Error.', null, HttpCode::BadRequest);
+            return $this->sendError(['Validation Error.'], HttpCode::BadRequest);
         }
         $data = $this->getExportData($request);
         $fileName = $this->exportFileName . '-' . date('Y-m-d');
@@ -235,9 +229,10 @@ class UserController extends BaseController
 
     /**
      * handle different requests
-     * @param \Illuminate\Http\Request $request
+     *
+     * @param \Illuminate\Http\Request $request user request, must contain action
      * @param number $id user id
-     * return \Illuminate\Http\JsonResponse
+     * @return \Illuminate\Http\JsonResponse
      */
     public function handleRequests(Request $request, $id)
     {
@@ -249,21 +244,48 @@ class UserController extends BaseController
         return $response;
     }
 
+    /**
+     * activate user
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @param number $id user id
+     * @return \Illuminate\Http\JsonResponse
+     */
     private function activate(Request $request, $id)
     {
         return $this->sendError('Not implemented', null, HttpCode::NotImplemented);
     }
 
+    /**
+     * deactivate user
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @param number $id user id
+     * @return \Illuminate\Http\JsonResponse
+     */
     private function deactivate(Request $request, $id)
     {
         return $this->sendError('Not implemented', null, HttpCode::NotImplemented);
     }
 
     /**
+     * get user model from db; throws a 404 not found exception if item not found in database
+     *
+     * @param number $itemId user id for which to get the data
+     * @return \app\Models\User user model
+     */
+    private function getItemForEdit($itemId)
+    {
+        $data = $this->model::select($this->selectFields)->findOrFail($itemId);
+        return $data;
+    }
+
+
+    /**
      * validate item request before create / save
      *
      * @param \Illuminate\Http\Request $request user request
-     * @param number $id permission id
+     * @param number $id user id
      * @return object an object with the fields { failed, errors }
      */
     private function validateItemRequest(Request $request, $id = null)
@@ -298,6 +320,12 @@ class UserController extends BaseController
         return $this->validateRules($request, $rules, $customValidation);
     }
 
+    /**
+     * function to validate a password strength; if validation fails, it will add to the validator, a new error
+     *
+     * @param Request $request user request, must contain 'password'
+     * @param \Illuminate\Support\Facades\Validator a validator object
+     */
     private function validatePasswordStrength(Request $request, $validator)
     {
         if (!$this->verifyPasswordStrength($request->password)) {
@@ -309,7 +337,7 @@ class UserController extends BaseController
      * save new user in database, from provided request
      *
      * @param \Illuminate\Http\Request $request user request
-     * @return object the created entity
+     * @return \app\Models\User the created entity
      */
     private function createItem(Request $request)
     {
@@ -323,10 +351,15 @@ class UserController extends BaseController
         // set user role
         $item->roles()->attach($request->role);
 
-
         return $item;
     }
 
+    /**
+     * function to verify a password strength
+     *
+     * @param string $password password to verify
+     * @return boolean true if password strength is correct, false otherwise
+     */
     private function verifyPasswordStrength($password)
     {
         $uppercase = preg_match('@[A-Z]@', $password);
@@ -338,11 +371,11 @@ class UserController extends BaseController
     }
 
     /**
-     * update permission in database, from provided request
+     * update user in database, from provided request
      *
      * @param \Illuminate\Http\Request $request user request
-     * @param number $itemId id of the permission to save
-     * @return object the updated entity
+     * @param number $itemId id of the user to save
+     * @return \app\Models\User the updated entity
      */
     private function saveItem(Request $request, $itemId)
     {
@@ -374,7 +407,7 @@ class UserController extends BaseController
      * get data for export from db, for the given request
      *
      * @param \Illuminate\Http\Request $request http request
-     * @return array a list with all permissions
+     * @return array a list with users filtered by the given request
      */
     private function getExportData(Request $request)
     {
@@ -436,7 +469,7 @@ class UserController extends BaseController
     /**
      * get the csv content for the given data
      *
-     * @param array $data array of permission models
+     * @param array $data array of user models
      * @return string csv content for provided data
      */
     private function getCsvContent($data)
@@ -448,8 +481,9 @@ class UserController extends BaseController
     }
 
     /**
-     * delete all data of a user
-     * @param object $user user object
+     * delete all data of a user, from all tables in the database
+     *
+     * @param \app\Models\User user entity
      */
     private function deleteUserEntries($user)
     {
@@ -460,6 +494,11 @@ class UserController extends BaseController
         $user->tokens()->delete();
     }
 
+    /**
+     * delete data for all given user ids, from all tables in the database
+     *
+     * @param array userIds array with user ids
+     */
     private function deleteUsersEntries($usersIds)
     {
         UserInfo::whereIn('user_id', $usersIds)->delete();

@@ -14,15 +14,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
- * class which handles the list / create / update / delete of roles
+ * class which handles the list / update of role permissions
  */
 class RolePermissionsController extends BaseController
 {
     protected $translationPrefix = 'permission.';
     protected $model = 'App\Models\RolesPermission';
-    private $updateFields; // fields that will be updated on save
     private $selectFields;
-    private $filterFields;
 
     public function __construct()
     {
@@ -35,23 +33,45 @@ class RolePermissionsController extends BaseController
 
     /**
      * get a list with all the permissions and the selected values for the specified role
+     *
      * @param number $roleId role for which to get permissions
-     * @return array list of permissions : [{ id, name, active }]
+     * @return \Illuminate\Http\JsonResponse response which contains the list with permissions  [{ id, name, slug, active }]
+     *              or 404 not found
      */
     public function list($roleId)
     {
+        $rolePermissionsList = $this->getRolePermissionsList($roleId);
+        $dataCount = count($rolePermissionsList);
+        return $this->sendResponse($rolePermissionsList, HttpCode::OK, ['totalCount' => $dataCount]);
+    }
+
+    /**
+     * get a list with all the permissions and the selected values for the specified role
+     *
+     * @param number $roleId role for which to get permissions
+     * @return array list with permissions [{ id, name, slug, active }]
+     *
+     */
+    private function getRolePermissionsList($roleId)
+    {
+        // make sure the role exists in the database
+        Role::select(['id'])->findOrFail($roleId);
+
+        // get all permissions
         $permissionList = Permission::select(['id', 'name', 'slug'])->get()->toArray();
 
-        // get role permissions
+        // get permissions for the role
         $rolePermissions = RolesPermission::where('role_id', $roleId)->get();
+        // create an indexed array by permission id
         $rolePermissionsIndexed = [];
         if (count($rolePermissions) > 0) {
             foreach ($rolePermissions as $rolePermission) {
                 $rolePermissionsIndexed[$rolePermission->permission_id] = 1;
             }
         }
+
+        // create the permissions array and set the permissions active status
         $rolePermissionsList = [];
-        // set the permissions active status
         foreach ($permissionList as $permission) {
             $active = isset($rolePermissionsIndexed[$permission['id']]) ? 1 : 0;
             $permissionItem = (object) ['id' => $permission['id'], 'name' => $permission['name'], 'slug' => $permission['slug'], 'active' => $active];
@@ -63,21 +83,28 @@ class RolePermissionsController extends BaseController
 
     /**
      * update role permissions in database
-     * @param \Illuminate\Http\Request $request http request which must contain only the permission ids which are set
+     *
+     * @param \Illuminate\Http\Request $request user request which must contain only the permission ids which are set
      * @param number $id role id for which to update
-     * @return \Illuminate\Http\JsonResponse json object with the saved permissions
+     * @return \Illuminate\Http\JsonResponse json object with the saved permissions or a validation error message
      */
     public function update(Request $request, $id)
     {
         $validator = $this->validateUpdateRequest($id, $request);
         if (!$validator['success']) {
-            return $this->sendError('Validation Error.', null, HttpCode::BadRequest);
+            return $this->sendError(['Validation Error'], HttpCode::BadRequest);
         }
         $saveData = $this->getSaveData($id, $validator['data']);
         $this->savePermissions($id, $saveData);
-        return $this->sendResponse($saveData, 'Role permissions updated successfully.');
+        return $this->sendResponse($saveData);
     }
 
+    /**
+     * validate export params
+     *
+     * @param \Illuminate\Http\Request $request user request, must contain: export_format
+     * @return boolean true if parameters are valid, false otherwise
+     */
     private function validateExport(Request $request)
     {
         if (!$request->has('export_format')) {
@@ -88,19 +115,20 @@ class RolePermissionsController extends BaseController
 
     /**
      * export selected data
-     * @param \Illuminate\Http\Request $request http request, must contain: export_format
+     *
+     * @param \Illuminate\Http\Request $request user request, must contain: export_format
      * @param number id role id for which to export permissions
-     * @return \Illuminate\Http\Response containing the exported data
+     * @return \Illuminate\Http\Response containing the exported data or a bad request if request not valid
      */
     public function export(Request $request, $id)
     {
         if (!$this->validateExport($request)) {
-            return $this->sendError('Validation Error.', null, HttpCode::BadRequest);
+            return $this->sendError(['Validation Error.'], HttpCode::BadRequest);
         }
         $role = Role::select('slug')->findOrFail($id);
         $data = $this->getExportData($request, $id);
         $fileName = 'role-' . $role->slug . '-permissions-' . date('Y-m-d');
-        $exportFormat = $request->has('export_format') ? $request->export_format : null;
+        $exportFormat = $request->export_format;
 
         switch ($exportFormat) {
             case 'csv':
@@ -121,19 +149,20 @@ class RolePermissionsController extends BaseController
 
     /**
      * get data for export from db, for the given request
-     * @param \Illuminate\Http\Request $request http request
+     *
+     * @param \Illuminate\Http\Request $request user request
      * @param number $id role id
-     * @return array with permissions for given role id
+     * @return array a list with all permissions for given role id
      */
     private function getExportData(Request $request, $id)
     {
-        $data = $this->list($id);
-        return $data;
+        return $this->getRolePermissionsList($id);
     }
 
     /**
      * get the csv content for the given data
-     * @param array $data array of role models
+     *
+     * @param array $data array of permission models
      * @return string csv content for provided data
      */
     private function getCsvContent($data)
@@ -143,13 +172,13 @@ class RolePermissionsController extends BaseController
         return ExportUtils::getCsvContent($data, $columnList, $this->selectFields);
     }
 
-    /** functions used to create / update role - BEGIN */
+    /** functions used to update role permissions - BEGIN */
 
     /**
      * update role permissions in database, from provided data
+     *
      * @param number $roleId role id
      * @param array $data an array containing the save data items: [ [roleId, permissionId], ... ]
-     * @return array updated permissions
      */
     private function savePermissions($roleId, $data)
     {
@@ -163,13 +192,14 @@ class RolePermissionsController extends BaseController
 
     /**
      * validate update request
-     * @param number $roleId role id
-     * @param object $request http request which must contain only the permission ids which are set
+     *
+     * @param number $roleId role id for which to validate the update request
+     * @param object $request user request which must contain only the permission ids which are set
      * @return array a response array which contains ['success', 'data']
      */
     private function validateUpdateRequest($roleId, Request $request)
     {
-        $response = $this->createResponse(false);
+        $response = ['success' => false];
         // if request doesn't have ids, return invalid response
         if (!$request->has('ids')) {
             return $response;
@@ -180,7 +210,7 @@ class RolePermissionsController extends BaseController
 
         // decode the request ids
         $ids = json_decode($request->ids, JSON_NUMERIC_CHECK);
-         // if empty request array, return true, to delete all role permissions
+        // if empty request array, return true, to delete all role permissions
         if (empty($ids)) {
             $response['success'] = true;
             $response['data'] = $ids;
@@ -206,9 +236,10 @@ class RolePermissionsController extends BaseController
 
     /**
      * get the data to save in database
-     * @param number $roleId role id for which to save the permissions
+     *
+     * @param number $roleId role id for which to get the save data
      * @param array $permissionIds array with the permission ids which to save in the pivot table role_permssions
-     * @return {array} an empty array if there is no permission to save, otherwise an array containing ['role_id', 'permission_id']
+     * @return array an empty array if there is no permission to save, otherwise an array containing ['role_id', 'permission_id']
      */
     private function getSaveData($roleId, $permissionIds)
     {
@@ -223,6 +254,6 @@ class RolePermissionsController extends BaseController
         return $data;
     }
 
-    /** functions used to create / update role - END */
+    /** functions used to update role permissions - END */
 
 }

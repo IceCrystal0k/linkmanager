@@ -21,7 +21,6 @@ use Illuminate\Validation\Rule;
 
 class AccountController extends BaseController
 {
-
     protected $translationPrefix = 'account.';
     private $updateFields; // fields that will be updated on update profile request
     private $partialUpdateFields; // fields that will be updated on partial update request
@@ -32,6 +31,7 @@ class AccountController extends BaseController
         $this->updateFields = ['first_name', 'last_name'];
         $this->partialUpdateFields = ['google_id', 'fb_id'];
 
+        // declare the custom validation function
         $this->customValidation = function ($request, $validator) {
             return $this->validatePasswordStrength($request, $validator);
         };
@@ -40,14 +40,14 @@ class AccountController extends BaseController
     /**
      * Register account
      *
-     * @param \Illuminate\Http\Request
-     * @return \Illuminate\Http\Response
+     * @param \Illuminate\Http\Request $request user request
+     * @return \Illuminate\Http\JsonResponse response containing the token and user info if registration was successful, otherwise an error message
      */
     public function register(Request $request)
     {
         $validator = $this->validateRegister($request);
         if ($validator->failed) {
-            return $this->sendError('Validation Error.', $validator->errors, HttpCode::BadRequest);
+            return $this->sendError($validator->errors, HttpCode::BadRequest);
         }
 
         // get input data
@@ -67,78 +67,77 @@ class AccountController extends BaseController
         $user->roles()->attach(UserRole::User);
         // send verification email
         $emailResponse = $this->sendEmailVerificationNotification($user);
-        if (!$emailResponse['success']) {
-            return $this->sendError($emailResponse['message'], null, $emailResponse['code']);
+        $emailSendErrors = null;
+        if ($emailResponse['status'] !== HttpCode::OK) {
+            $emailSendErrors = ['errors' => ['email' => $emailResponse['errors']]];
         }
-        return $this->sendResponse($response, 'User registered successfully.', HttpCode::Created);
+        return $this->sendResponse($response, HttpCode::Created, $emailSendErrors);
     }
 
     /**
-     * Delete account
+     * Get user account data
      *
-     * @param \Illuminate\Http\Request
-     * @return \Illuminate\Http\Response
-     */
-    public function delete(Request $request)
-    {
-        $response = ['no_message' => 'just deleted'];
-        return $this->sendResponse($response, 'Account deleted.');
-    }
-
-    /**
-     * Get account data
-     *
-     * @param \Illuminate\Http\Request
-     * @return \Illuminate\Http\Response
+     * @param \Illuminate\Http\Request $request user request
+     * @return \Illuminate\Http\Response response containing user information
      */
     public function getProfile(Request $request)
     {
         $response = auth('sanctum')->user();
-        return $this->sendResponse($response, 'Get profile data');
+        return $this->sendResponse($response);
     }
 
     /**
      * Update account data
      *
-     * @param \Illuminate\Http\Request
-     * @return \Illuminate\Http\Response
+     * @param \Illuminate\Http\Request $request user request
+     * @return \Illuminate\Http\Response response containing the user updated information or a validation error
      */
     public function updateProfile(Request $request)
     {
+        $validator = $this->validateUpdate($request);
+        if ($validator->failed) {
+            return $this->sendError($validator->errors, HttpCode::BadRequest);
+        }
+
         $authUser = auth('sanctum')->user();
         $user = User::findOrFail($authUser->id);
         Form::updateModelFromRequest($request, $user, $this->updateFields);
         $user->save();
         $response = $user;
-        return $this->sendResponse($response, 'Update profile data');
+        return $this->sendResponse($response);
     }
 
     /**
      * Partial update account data
      *
-     * @param \Illuminate\Http\Request
-     * @return \Illuminate\Http\Response
+     * @param \Illuminate\Http\Request $request user request
+     * @return \Illuminate\Http\Response response containing the user updated information
      */
     public function partialUpdateProfile(Request $request)
     {
+        $validator = $this->validatePartialUpdate($request);
+        if ($validator->failed) {
+            return $this->sendError($validator->errors, HttpCode::BadRequest);
+        }
+
         $authUser = auth('sanctum')->user();
         $user = User::findOrFail($authUser->id);
         Form::updateModelFromRequest($request, $user, $this->partialUpdateFields);
         $user->save();
         $response = $user;
-        return $this->sendResponse($response, 'Partial update profile data');
+        return $this->sendResponse($response);
     }
 
     /**
      * Send email, according to the specified action
      *
-     * @param \Illuminate\Http\Request
-     * @return \Illuminate\Http\Response
+     * @param \Illuminate\Http\Request $request user request
+     * @return \Illuminate\Http\Response an empty response if the email was sent, or an error
      */
     public function sendEmail(Request $request)
     {
         if (!$request->has('action')) {
-            $this->sendError('Invalid action request', null, HttpCode::BadRequest);
+            $this->sendError(['Invalid action request'], HttpCode::BadRequest);
         }
         $action = $request->has('action') ? $request->action : null;
         switch ($action) {
@@ -146,9 +145,9 @@ class AccountController extends BaseController
                 break;
             case 'remove-account':$response = $this->sendRemoveAccountEmail();
                 break;
-            case 'reset-password':$response = $this->sendResetPasswordEmail();
+            case 'reset-password':$response = $this->sendResetPasswordEmail($request);
                 break;
-            default:$response = $this->sendError('Invalid request', null, HttpCode::BadRequest);
+            default:$response = $this->sendError(['Invalid request'], HttpCode::BadRequest);
                 break;
         }
         return $response;
@@ -156,70 +155,83 @@ class AccountController extends BaseController
 
     /**
      * send verification email
+     *
+     * @return \Illuminate\Http\Response an empty response if the email was sent, or an error
      */
     private function sendVerificationEmail()
     {
         $user = auth('sanctum')->user();
         if ($user->email_verified_at) {
-            return $this->sendError('Email already verified');
+            return $this->sendError(['Email already verified'], HttpCode::AlreadyReported);
         }
 
         // send verification email
         $emailResponse = $this->sendEmailVerificationNotification($user);
-        if (!$emailResponse['success']) {
-            return $this->sendError($emailResponse['message'], null, $emailResponse['code']);
+        if ($emailResponse['status'] !== HttpCode::OK) {
+            return $this->sendError([$emailResponse['errors']], $emailResponse['status']);
         } else {
-            return $this->sendResponse(null, 'Verification email sent');
+            return $this->sendEmptyResponse(HttpCode::Created);
         }
     }
 
     /**
      * send email for user to confirm the removing of his account
+     *
+     * @return \Illuminate\Http\Response an empty response if the email was sent, or an error
      */
     private function sendRemoveAccountEmail()
     {
         $user = auth('sanctum')->user();
         if (!$user) {
-            return $this->sendError('User doesn\'t exists');
+            return $this->sendError(['User doesn\'t exists']);
         }
 
         // send delete account email
         $emailResponse = $this->sendEmailDeleteNotification($user);
-        if (!$emailResponse['success']) {
-            return $this->sendError($emailResponse['message'], null, $emailResponse['code']);
+        if ($emailResponse['status'] !== HttpCode::OK) {
+            return $this->sendError([$emailResponse['errors']], $emailResponse['status']);
         } else {
-            return $this->sendResponse(null, 'Delete account email sent');
+            return $this->sendEmptyResponse(HttpCode::Created);
         }
     }
 
     /**
      * send email for user to confirm the password rest
+     *
+     * @param \Illuminate\Http\Request $request user request, must contain the email field
+     * @return \Illuminate\Http\Response an empty response if the email was sent, or an error
      */
-    private function sendResetPasswordEmail()
+    private function sendResetPasswordEmail($request)
     {
-        $user = auth('sanctum')->user();
+        $validator = $this->validateEmail($request);
+        if ($validator->failed) {
+            return $this->sendError($validator->errors, HttpCode::BadRequest);
+        }
+
+        $user = User::where('email', $request->email)->first();
         if (!$user) {
-            return $this->sendError('User doesn\'t exists');
+            return $this->sendError(['User doesn\'t exists']);
         }
 
         // send reset password email
         $emailResponse = $this->sendEmailResetPasswordNotification($user);
-        if (!$emailResponse['success']) {
-            return $this->sendError($emailResponse['message'], null, $emailResponse['code']);
+        if ($emailResponse['status'] !== HttpCode::OK) {
+            return $this->sendError([$emailResponse['errors']], $emailResponse['status']);
         } else {
-            return $this->sendResponse(null, 'Reset password email sent');
+            return $this->sendEmptyResponse(HttpCode::Created);
         }
     }
 
     /**
      * handle different requests
      *
-     * @return \Illuminate\Http\Response
+     * @param Request $request user request, must contain the field : 'action'
+     * @return \Illuminate\Http\Response an empty response if the request was handled, or an error
      */
     public function handleAccountRequests(Request $request)
     {
         if (!$request->has('action')) {
-            $this->sendError('Action not specified', null, HttpCode::BadRequest);
+            $this->sendError(['Action not specified'], HttpCode::BadRequest);
         }
 
         $action = $request->has('action') ? $request->action : null;
@@ -232,23 +244,25 @@ class AccountController extends BaseController
                 break;
             case 'reset-password':$response = $this->resetPassword($request);
                 break;
-            default:$response = $this->sendError('Invalid request', null, HttpCode::BadRequest);
+            case 'update-password':$response = $this->updateUserPassword($request);
+                break;
+            default:$response = $this->sendError(['Invalid request'], HttpCode::BadRequest);
                 break;
         }
         return $response;
     }
 
     /**
-     * verify account email
+     * confirm the verification of an account
      *
-     * @param \Illuminate\Http\Request
-     * @return \Illuminate\Http\Response
+     * @param \Illuminate\Http\Request $request user request, must contain the field 'token'
+     * @return \Illuminate\Http\Response an empty response if the email was confirmed, or an error
      */
     private function confirmAccountVerification(Request $request)
     {
-        $response = ['info' => __($this->translationPrefix . 'AccountRequestErrorInfo')];
+        $error = __($this->translationPrefix . 'AccountRequestErrorInfo');
         if (!$request->has('token')) {
-            return $this->sendError('Account Request Error.', $response, HttpCode::BadRequest);
+            return $this->sendError([$error], HttpCode::BadRequest);
         }
         $tokenItem = UserEmailToken::where('token', $request->token)->where('action', 'verify-email')->first();
         $validRequest = $this->isValidUserEmailToken($tokenItem);
@@ -259,26 +273,26 @@ class AccountController extends BaseController
             if ($user) {
                 $user->email_verified_at = \Carbon\Carbon::now();
                 $user->save();
-                return $this->sendResponse(null, 'Account confirmed');
+                return $this->sendEmptyResponse(HttpCode::Created);
             }
-            $response['info'] = __($this->translationPrefix . 'AccountRequestUserNotFound');
+            $error = __($this->translationPrefix . 'AccountRequestUserNotFound');
         }
-        return $this->sendError('Account Request Error.', $response, HttpCode::BadRequest);
+        return $this->sendError([$error], HttpCode::BadRequest);
     }
 
     /**
      * completely remove user and references from db
      *
-     * @param \Illuminate\Http\Request
+     * @param \Illuminate\Http\Request $request user request, must contain the 'token' field
      * @param number $id user id
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Http\Response an empty response if the account was removed, or an error
      */
     private function removeAccount(Request $request)
     {
         // check request token
-        $response = ['info' => __($this->translationPrefix . 'AccountRequestErrorInfo')];
+        $error = __($this->translationPrefix . 'AccountRequestErrorInfo');
         if (!$request->has('token')) {
-            return $this->sendError('Account Request Error.', $response, HttpCode::BadRequest);
+            return $this->sendError([$error], HttpCode::BadRequest);
         }
 
         // verify if it's a valid request
@@ -292,15 +306,18 @@ class AccountController extends BaseController
             if ($user) {
                 $this->deleteUserEntries($user);
                 $user->delete();
-                return $this->sendResponse(null, 'Account deleted');
+                return $this->sendEmptyResponse(HttpCode::Created);
             }
-            $response['info'] = __($this->translationPrefix . 'AccountRequestUserNotFound');
+            $error = __($this->translationPrefix . 'AccountRequestUserNotFound');
         }
-        return $this->sendError('Account Request Error.', $response, HttpCode::BadRequest);
+        return $this->sendError([$error], HttpCode::BadRequest);
     }
 
     /**
      * delete all user entries from database
+     *
+     * @param \App\Models\User $user user for which to delete db entries; must contain id and email
+     * @return void
      */
     private function deleteUserEntries($user)
     {
@@ -312,37 +329,37 @@ class AccountController extends BaseController
     }
 
     /**
-     * Get token info for reset password
+     * Get the info associated to the given request token, for reset password
      *
-     * @param \Illuminate\Http\Request
-     * @return \Illuminate\Http\Response
+     * @param \Illuminate\Http\Request $request user request, must contain the field 'token'
+     * @return \Illuminate\Http\Response response containing the user email associated to the token, or an error
      */
     private function getTokenInfo(Request $request)
     {
-        $response = ['info' => __($this->translationPrefix . 'AccountRequestErrorInfo')];
+        $error = __($this->translationPrefix . 'AccountRequestErrorInfo');
         if (!$request->has('token')) {
-            return $this->sendError('Account Request Error.', $response, HttpCode::BadRequest);
+            return $this->sendError($error, HttpCode::BadRequest);
         }
         $tokenItem = UserEmailToken::where('token', $request->token)->where('action', 'reset-password')->first();
         $validRequest = $this->isValidUserEmailToken($tokenItem);
         if ($validRequest) {
             $response['info'] = $tokenItem->email;
-            return $this->sendResponse($response, 'Token info');
+            return $this->sendResponse($response, HttpCode::Created);
         }
-        return $this->sendError('Account Request Error.', $response, HttpCode::BadRequest);
+        return $this->sendError([$error], HttpCode::BadRequest);
     }
 
     /**
-     * Reset password
+     * Reset user password
      *
-     * @param \Illuminate\Http\Request
-     * @return \Illuminate\Http\Response
+     * @param \Illuminate\Http\Request user request, must contain the token, password and new password
+     * @return \Illuminate\Http\Response empty response if successful, otherwise an error
      */
     public function resetPassword(Request $request)
     {
-        $response = ['info' => __($this->translationPrefix . 'AccountRequestErrorInfo')];
+        $error = __($this->translationPrefix . 'AccountRequestErrorInfo');
         if (!$request->has('token')) {
-            return $this->sendError('Account Request Error.', $response, HttpCode::BadRequest);
+            return $this->sendError([$error], HttpCode::BadRequest);
         }
 
         // check if the request is valid
@@ -351,7 +368,7 @@ class AccountController extends BaseController
         if ($validRequest) {
             $validator = $this->validatePassword($request);
             if ($validator->failed) {
-                return $this->sendError('Validation Error.', $validator->errors, HttpCode::BadRequest);
+                return $this->sendError($validator->errors, HttpCode::BadRequest);
             }
 
             $tokenItem->delete();
@@ -359,17 +376,35 @@ class AccountController extends BaseController
             $user = User::where('email', $tokenItem->email)->first();
             if ($user) {
                 $this->updatePassword($user, $request->password);
-                return $this->sendResponse(null, 'Password reset');
+                return $this->sendEmptyResponse(HttpCode::Created);
             }
-            $response['info'] = __($this->translationPrefix . 'AccountRequestUserNotFound');
+            $error = __($this->translationPrefix . 'AccountRequestUserNotFound');
         }
-        return $this->sendError('Account Request Error.', $response, HttpCode::BadRequest);
+        return $this->sendError([$error], HttpCode::BadRequest);
+    }
+
+    /**
+     * update user password
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @return \Illuminate\Http\Response empty response if successful, otherwise an error
+     */
+    public function updateUserPassword(Request $request)
+    {
+        $validator = $this->validatePassword($request);
+        if ($validator->failed) {
+            return $this->sendError($validator->errors, HttpCode::BadRequest);
+        }
+        $user = auth('sanctum')->user();
+        // update the user password
+        $this->updatePassword($user, $request->password);
+        return $this->sendEmptyResponse(HttpCode::Created);
     }
 
     /**
      * validate registration request
      *
-     * @param \Illuminate\Http\Request
+     * @param \Illuminate\Http\Request $request user request
      * @return object response with { failed, errors }
      */
     private function validateRegister(Request $request)
@@ -385,9 +420,54 @@ class AccountController extends BaseController
     }
 
     /**
+     * validate update request
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @return object response with { failed, errors }
+     */
+    private function validateUpdate(Request $request)
+    {
+        $rules = [
+            'first_name' => ['required', 'max:255'],
+            'last_name' => ['required', 'max:255']
+        ];
+        return $this->validateRules($request, $rules);
+    }
+
+    /**
+     * validate partial update request
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @return object response with { failed, errors }
+     */
+    private function validatePartialUpdate(Request $request)
+    {
+        $rules = [
+            'fb_id' => ['required_without:google_id', 'integer', 'nullable', 'between:0,1'],
+            'google_id' => ['required_without:fb_id', 'integer', 'nullable', 'between:0,1']
+        ];
+        return $this->validateRules($request, $rules);
+    }
+
+    /**
+     * validate email for password reset request
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @return object response with { failed, errors }
+     */
+    private function validateEmail(Request $request)
+    {
+        $rules = [
+            'email' => ['required', 'email', 'exists:users'],
+        ];
+        return $this->validateRules($request, $rules);
+    }
+
+
+    /**
      * validate password strength
      *
-     * @param \Illuminate\Http\Request
+     * @param \Illuminate\Http\Request $request user request
      * @return object response with { failed, errors }
      */
     protected function validatePasswordStrength(Request $request, $validator)
@@ -400,7 +480,7 @@ class AccountController extends BaseController
     /**
      * validate password
      *
-     * @param \Illuminate\Http\Request
+     * @param \Illuminate\Http\Request $request user request
      * @return object response with { failed, errors }
      */
     private function validatePassword(Request $request)
@@ -413,12 +493,11 @@ class AccountController extends BaseController
         return $this->validateRules($request, $rules, $this->customValidation);
     }
 
-
     /**
      * verify password strength
      *
      * @param string $password
-     * @return true if password strength is verified
+     * @return boolean if password strength is verified, returns true, false otherwise
      */
     private function verifyPasswordStrength($password)
     {
@@ -431,10 +510,11 @@ class AccountController extends BaseController
     }
 
     /**
-     * update password
+     * update password in database, for the given user
      *
      * @param \app\Models\User $user user model
      * @param string $password
+     * @return void
      */
     private function updatePassword($user, $password)
     {
@@ -446,14 +526,14 @@ class AccountController extends BaseController
      * send verification email
      *
      * @param \app\Models\User $user user model
-     * @return array response containing [success, message, code ]
+     * @return array response containing [errors, status ]
      */
     private function sendEmailVerificationNotification($user)
     {
         $accessToken = hash('sha256', Str::random(40));
 
         $response = $this->createVerificationEntry($user->email, $accessToken);
-        if (!$response['success']) {
+        if ($response['status'] !== HttpCode::OK) {
             return $response;
         }
 
@@ -466,9 +546,8 @@ class AccountController extends BaseController
         try {
             Mail::to($user->email)->send(new VerifyEmail($message));
         } catch (\Exception $e) {
-            $response['success'] = false;
-            $response['message'] = $e->getMessage();
-            $response['code'] = HttpCode::UnprocessableEntity;
+            $response['errors'] = [$e->getMessage()];
+            $response['status'] = HttpCode::UnprocessableEntity;
         }
         return $response;
     }
@@ -477,14 +556,14 @@ class AccountController extends BaseController
      * send email confirmation for delete account
      *
      * @param \app\Models\User $user user model
-     * @return array response containing [success, message, code ]
+     * @return array response containing [errors, status ]
      */
     private function sendEmailDeleteNotification($user)
     {
         $accessToken = hash('sha256', Str::random(40));
 
         $response = $this->createDeleteEntry($user->email, $accessToken);
-        if (!$response['success']) {
+        if ($response['status'] !== HttpCode::OK) {
             return $response;
         }
 
@@ -497,9 +576,8 @@ class AccountController extends BaseController
         try {
             Mail::to($user->email)->send(new AccountDelete($message));
         } catch (\Exception $e) {
-            $response['success'] = false;
-            $response['message'] = $e->getMessage();
-            $response['code'] = HttpCode::UnprocessableEntity;
+            $response['errors'] = [$e->getMessage()];
+            $response['status'] = HttpCode::UnprocessableEntity;
         }
         return $response;
     }
@@ -508,19 +586,19 @@ class AccountController extends BaseController
      * send email confirmation for reset password
      *
      * @param \app\Models\User $user user model
-     * @return array response containing [success, message, code ]
+     * @return array response containing [errors, status ]
      */
     private function sendEmailResetPasswordNotification($user)
     {
         $accessToken = hash('sha256', Str::random(40));
 
         $response = $this->createResetPasswordEntry($user->email, $accessToken);
-        if (!$response['success']) {
+        if ($response['status'] !== HttpCode::OK) {
             return $response;
         }
 
         $message = (object) [
-            'name' => $user->first_name . ' ' . $user->last_name,
+            'email' => $user->email,
             'website' => url('/'),
             'resetLink' => url('/') . '/reset-password/' . $accessToken,
             'subject' => 'Reset password',
@@ -528,9 +606,8 @@ class AccountController extends BaseController
         try {
             Mail::to($user->email)->send(new ResetPassword($message));
         } catch (\Exception $e) {
-            $response['success'] = false;
-            $response['message'] = $e->getMessage();
-            $response['code'] = HttpCode::UnprocessableEntity;
+            $response['errors'] = [$e->getMessage()];
+            $response['status'] = HttpCode::UnprocessableEntity;
         }
         return $response;
     }
@@ -541,7 +618,7 @@ class AccountController extends BaseController
      * @param string $email user email
      * @param string $accessToken access token
      *
-     * @return array an associative array containing [success, message, code]
+     * @return array an associative array containing [errors, status]
      */
     private function createVerificationEntry($email, $accessToken)
     {
@@ -554,7 +631,7 @@ class AccountController extends BaseController
      * @param string $email user email
      * @param string $accessToken access token
      *
-     * @return array an associative array containing [success, message, code]
+     * @return array an associative array containing [errors, status]
      */
     private function createDeleteEntry($email, $accessToken)
     {
@@ -567,7 +644,7 @@ class AccountController extends BaseController
      * @param string $email user email
      * @param string $accessToken access token
      *
-     * @return array an associative array containing [success, message, code]
+     * @return array an associative array containing [errors, status]
      */
     private function createResetPasswordEntry($email, $accessToken)
     {
@@ -580,11 +657,11 @@ class AccountController extends BaseController
      * @param {string} $email   email for which to create the token
      * @param {string} $action  the action for which to create the token
      * @param {string} $accessToken the access token
-     * @return array an associative array containing [success, message, code]
+     * @return array an associative array containing [errors, status]
      */
     private function createUserEmailToken($email, $action, $accessToken)
     {
-        $response = $this->createResponse(true);
+        $response = $this->createResponse();
         $userEmailToken = UserEmailToken::where('email', $email)->where('action', $action)->first();
         // verify if there is already an entry in the database for the given email and action
         if ($userEmailToken) {
@@ -594,9 +671,8 @@ class AccountController extends BaseController
                 $now = \Carbon\Carbon::now();
                 $diffMinutes = $requestDate->diffInMinutes($now);
                 if ($diffMinutes < 5) {
-                    $response['success'] = false;
-                    $response['message'] = $this->getTranslatedAction($action);
-                    $response['code'] = HttpCode::TooManyRequests;
+                    $response['errors'] = [$this->getTranslatedAction($action)];
+                    $response['status'] = HttpCode::TooManyRequests;
                     return $response;
                 }
             }
@@ -637,7 +713,7 @@ class AccountController extends BaseController
     /**
      * translate the given action
      *
-     * @param string @action
+     * @param string @action the action key to translate
      * @return string the translated action
      */
     private function getTranslatedAction($action)

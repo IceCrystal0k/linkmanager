@@ -8,48 +8,61 @@ use Illuminate\Support\Facades\Validator;
 class BaseController extends Controller
 {
     protected $exportPath = 'exports';
+
     /**
      * success response method.
      *
+     * @param mixed $result the result to return
+     * @param number $status the http status code to return
+     * @param array $extraInfo additional information to be added to the response, can contain totalCount, etc
      * @return \Illuminate\Http\JsonResponse
      */
-    public function sendResponse($result, $message, $code = 200)
+    public function sendResponse($result, $status = 200, $extraInfo = null)
     {
-        $response = $this->createResponse(true, $message, $result, $code);
-        return response()->json($response, $code);
+        $response = $this->createResponse($result, $status, $extraInfo);
+        return response()->json($response, $status);
     }
 
     /**
      * return an error response
      *
+     * @param array $errors array with error information
+     * @param number $status the http status code to return
      * @return \Illuminate\Http\JsonResponse
      */
-    public function sendError($error, $errorMessages = [], $code = 404)
+    public function sendError($errors, $status = 404)
     {
-        $response = $this->createResponse(false, $error, $errorMessages, $code);
-        return response()->json($response, $code);
+        $response = $this->createResponse(null, $status, ['errors' => $errors]);
+        return response()->json($response, $status);
     }
 
     /**
-     * return an empty response.
+     * return an empty response
      *
+     * @param number $status the http status code to return
      * @return \Illuminate\Http\Response
      */
-    public function sendEmptyResponse($code = 404)
+    public function sendEmptyResponse($status = 404)
     {
-        return response()->noContent($code);
+        return response()->noContent($status);
     }
 
     /**
-     * @return array an associative array
+     * create a response from the provided params
+     *
+     * @param mixed $data data to return
+     * @param number $status the http status code to return
+     * @param array $extraInfo extra info to add to the response
+     * @return array an associative array with the response
      */
-    protected function createResponse($success, $message = '', $data = null, $code = 200)
+    protected function createResponse($data = null, $status = 200, $extraInfo = null)
     {
         $response = [
-            'success' => $success,
-            'message' => $message,
-            'code' => $code,
+            'status' => $status
         ];
+        if (!empty($extraInfo)) {
+            $response = array_merge($response, $extraInfo);
+        }
         if (!empty($data)) {
             $response['data'] = $data;
         }
@@ -58,6 +71,7 @@ class BaseController extends Controller
 
     /**
      * validate a list of rules against the rquest
+     *
      * @param \Illuminate\Http\Request $request user request object
      * @param array $rules rules to validate
      * @param callable $customValidation optional function to set custom validation

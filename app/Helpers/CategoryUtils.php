@@ -7,42 +7,52 @@ use App\Models\Category;
 
 class CategoryUtils
 {
-    /**
-     * group files by category
-     *
-     * @param array $files : array with the files to group
-     * @return array list with files grouped by category
-     */
-    public function groupFilesByCategory($files)
-    {
-        $filesIndexed = $this->getFilesIndexed($files);
-        $categoryList = $this->getCategoriesTree(0);
-        return $this->getCustomFilesData($filesIndexed, $categoryList);
-    }
-
-    public function getCategoryRecursiveChildren($categoryId)
-    {
-        $categoryMap = $this->getCategoryMap();
-        $item = $categoryMap->GetCategoryItemById($categoryId);
-        return array_merge($item->RecursiveChildrenIdsArray, [$categoryId]);
-    }
 
     /**
      * get a categoryMap object
-     * @return {object} category map
+     *
+     * @return object category map
      */
     public function getCategoryMap()
     {
         $categories = $this->getCategoriesArray();
-        $categoryMap = CategoryMap::GetInstance();
+        $categoryMap = CategoryMap::getInstance();
         $categoryMap->mapCategories($categories);
         return $categoryMap;
     }
 
     /**
-     * group files by category id
+     * group files by category
+     *
+     * @param array $files array with the files to group
+     * @return array list with files grouped by category
+     */
+    public function groupFilesByCategory($files)
+    {
+        $filesIndexed = $this->getFilesIndexed($files);
+        $categoryMap = $this->getCategoryMap();
+        $categoryList = $categoryMap->tree;
+        return $this->getCustomFilesData($filesIndexed, $categoryList);
+    }
+
+    /**
+     * get the ids for all children and grand children of a category
+     *
+     * @param number $categoryId id of the category
+     * @return array list with the ids of all children and grand children
+     */
+    public function getCategoryRecursiveChildrenIds($categoryId)
+    {
+        $categoryMap = $this->getCategoryMap();
+        $item = $categoryMap->getCategoryItemById($categoryId);
+        return array_merge($item->RecursiveChildrenIdsArray, [$categoryId]);
+    }
+
+    /**
+     * index files by category id
+     *
      * @param array $files list of files
-     * @return array a list with the grouped files
+     * @return array a list with the indexed files
      */
     private function getFilesIndexed($files)
     {
@@ -60,7 +70,7 @@ class CategoryUtils
     /**
      * create an array with custom file objects for the given grouped files and categories
      *
-     * @param array $files list of files from which to create the custom ones
+     * @param array $groupFiles list of indexed files from which to create the custom ones
      * @param array $categories list of categories
      * @param array list with custom file objects
      */
@@ -84,19 +94,9 @@ class CategoryUtils
     }
 
     /**
-     * get categories as a tree
-     * @return {array} an array with category tree
-     */
-    private function getCategoriesTree($categoryId, $skipCategoryId = null)
-    {
-        $categoryMap = $this->getCategoryMap();
-        $categoryList = $categoryMap->GetCategoryTreeRecursive($categoryId, $skipCategoryId);
-        return $categoryList;
-    }
-
-    /**
      * get categories from db, ordered by parent and order_index
-     * @return {array} array of category models
+     *
+     * @return array list of category models
      */
     private function getCategoriesArray()
     {
@@ -105,10 +105,10 @@ class CategoryUtils
             ->orderBy('order_index')
             ->get()->toArray();
 
-        $categories = array_map(function ($item) {
+        $categoryList = array_map(function ($item) {
             return (object) $item;
         }, $categories);
 
-        return $categories;
+        return $categoryList;
     }
 }

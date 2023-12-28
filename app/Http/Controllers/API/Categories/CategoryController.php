@@ -33,8 +33,10 @@ class CategoryController extends BaseController
     }
 
     /**
-     * category list index
-     * @return {view} list view
+     * get category list
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @return \Illuminate\Http\JsonResponse response which contains the list with categories
      */
     public function list(Request $request)
     {
@@ -46,13 +48,15 @@ class CategoryController extends BaseController
             $exceptCategoryId = (int)$request->exceptCategoryId;
         }
         $data = $categoryMap->getTreeExcept($exceptCategoryId);
-        return $this->sendResponse($data, '');
+        $dataCount = $categoryMap->getCategoriesCount();
+        return $this->sendResponse($data, HttpCode::OK, ['totalCount' => $dataCount]);
     }
 
     /**
-     * ajax actions
-     * @param {object} $request http request
-     * @return {string} json with response data
+     * handle ajax actions
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @return \Illuminate\Http\JsonResponse response which contains the result of the action
      */
     public function actions(Request $request)
     {
@@ -74,32 +78,46 @@ class CategoryController extends BaseController
     {
         $validator = $this->validateItemRequest($request);
         if ($validator->failed) {
-            return $this->sendError('Validation Error.', $validator->errors, HttpCode::BadRequest);
+            return $this->sendError([$validator->errors], HttpCode::BadRequest);
         }
         $item = $this->createItem($request);
-        return $this->sendResponse($item, 'Link created successfully', HttpCode::Created);
+        return $this->sendResponse($item, HttpCode::Created);
     }
 
+    /**
+     * category get item
+     *
+     * @param number $id category id
+     * @return \Illuminate\Http\JsonResponse a json response, with the entity if found, otherwise throws a 404 not found
+     */
+    public function getItem($id)
+    {
+        $data = $this->getItemForEdit($id);
+        return $this->sendResponse($data);
+        return $data;
+    }
 
     /**
      * update category in database
-     * @param {object} $request http request
-     * @param {number} $id category id to update
-     * @return {view} edit view
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @param number $id category id to update
+     * @return \Illuminate\Http\JsonResponse a json response with the updated category or a Bad request with errors, if failed
      */
     public function update(Request $request, $id)
     {
         $validator = $this->validateItemRequest($request, $id);
         if ($validator->failed) {
-            return $this->sendError('Validation Error.', $validator->errors, HttpCode::BadRequest);
+            return $this->sendError([$validator->errors], HttpCode::BadRequest);
         }
         $response = $this->saveItem($request, $id);
-        return $this->sendResponse($response, 'Link updated successfully.');
+        return $this->sendResponse($response);
         // $this->saveSeo($request, $id);
     }
 
     /**
      * delete category and all children and grand children of the category
+     *
      * @param number $id category id
      * @return \Illuminate\Http\Response an empty response, which specifies if the entity was deleted or 404 not found if the entity was not found
      */
@@ -114,19 +132,20 @@ class CategoryController extends BaseController
     }
 
     /**
-     * delete selected categories and references from db
-     * @param {object} $request http request
-     * @return {view} list view
+     * delete selected categories and all their children and grand children from db
+     *
+     * @param \Illuminate\Http\Request $request user request, must contain ids as an array of numbers
+     * @return \Illuminate\Http\Response empty response if request is valid, otherwise a bad request status
      */
     public function deleteSelected(Request $request)
     {
         if (!$request->has('ids')) {
-            return $this->sendError('Validation Error.', null, HttpCode::BadRequest);
+            return $this->sendError(['Validation Error.'], HttpCode::BadRequest);
         }
         $ids = json_decode($request->ids, JSON_NUMERIC_CHECK);
         $ids = ArrayUtils::transformToPositiveIntegers($ids);
         if (!$ids) {
-            return $this->sendError('Validation Error.', null, HttpCode::BadRequest);
+            return $this->sendError(['Validation Error.'], HttpCode::BadRequest);
         }
         // delete all children and grand children
         $this->deleteChildrenRecursive($ids);
@@ -136,7 +155,9 @@ class CategoryController extends BaseController
 
      /**
      * validate export params
+     *
      * @param \Illuminate\Http\Request $request user request, must contain: export_format
+     * @return boolean true if parameters are valid, false otherwise
      */
     private function validateExport(Request $request)
     {
@@ -147,7 +168,7 @@ class CategoryController extends BaseController
     }
 
     /**
-     * export all permissions
+     * export all categories
      *
      * @param \Illuminate\Http\Request $request http request, must contain: export_format
      * @return \Illuminate\Http\Response containing the exported data
@@ -155,7 +176,7 @@ class CategoryController extends BaseController
     public function export(Request $request)
     {
         if (!$this->validateExport($request)) {
-            return $this->sendError('Validation Error.', null, HttpCode::BadRequest);
+            return $this->sendError(['Validation Error.'], HttpCode::BadRequest);
         }
         $data = $this->getExportData($request);
         $fileName = $this->exportFileName . '-' . date('Y-m-d');
@@ -180,6 +201,7 @@ class CategoryController extends BaseController
 
     /**
      * verify that the specified categoryId and the new parentId exists in the database
+     *
      * @param number $categoryId id of the category which is moved
      * @param number $newParentId id of the category where to move
      * @param object $categoryMap an object of type CategoryMap
@@ -215,11 +237,12 @@ class CategoryController extends BaseController
     }
 
     /**
-     * verify if the specified categoryId can be moved in the parentId
+     * verify if the specified categoryId can be moved in the new parentId
      * if the new parent (from dataSave) is the same as categoryId or is a child of categoryId, return error
-     * @param object $category category which is moved, must be a CategoryMapItem object
-     * @param {object} $newParentId id of the category where to move
-     * @return {object} response containing { status, message }
+     *
+     * @param \app\Helpers\CategoryMapItem $category category which is moved
+     * @param number $newParentId id of the category where to move
+     * @return object response containing { valid, error }
      */
     private function verifyMoveDataIntegrity($category, $newParentId)
     {
@@ -249,21 +272,10 @@ class CategoryController extends BaseController
     }
 
     /**
-     * category get item
-     * @param {number} $id category id
-     * @return {view} edit view
-     */
-    public function getItem($id)
-    {
-        $data = $this->getItemForEdit($id);
-        return $this->sendResponse($data, null);
-        return $data;
-    }
-
-    /**
-     * get category model from db
-     * @param {number} $itemId category id of the category for which to get the data
-     * @return {object} category model
+     * get category model for edit; throws a 404 not found exception if item not found in database
+     *
+     * @param number $itemId category id of the category for which to get the data
+     * @return \app\Models\Category category model
      */
     private function getItemForEdit($itemId)
     {
@@ -273,22 +285,21 @@ class CategoryController extends BaseController
 
     /**
      * get data for export from db, for the given request
-     * @param {object} $request http request
-     * @return {array} of page text models
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @return array a list with all categories
      */
     private function getExportData(Request $request)
     {
-        // selecting PDF view
-        $data = $this->model::select($this->exportFields)
-            ->get();
-
+        $data = $this->model::select($this->exportFields)->get();
         return $data;
     }
 
     /**
      * get the csv content for the given data
-     * @param {array} $data array of page text models
-     * @return {string} csv content for provided data
+     *
+     * @param array $data array of page category models
+     * @return string csv content for provided data
      */
     private function getCsvContent($data)
     {
@@ -381,38 +392,43 @@ class CategoryController extends BaseController
 
     /**
      * save new category in database, from provided request
-     * @param {object} $request http request
-     * @return {number} created id
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @return \app\Models\Category the created entity
      */
     private function createItem(Request $request)
     {
-        $category = new $this->model();
-        Form::updateModelFromRequest($request, $category, $this->updateFields);
-        if (!$category->parent_id) {
-            $category->parent_id = 0;
+        $item = new $this->model();
+        Form::updateModelFromRequest($request, $item, $this->updateFields);
+        if (!$item->parent_id) {
+            $item->parent_id = 0;
         }
 
-        $category->order_index = $this->getNextOrderIndex($category->parent_id);
-        $category->save();
-        return $category->id;
+        $item->order_index = $this->getNextOrderIndex($item->parent_id);
+        $item->save();
+        return $item;
     }
 
     /**
      * update category in database, from provided request
-     * @param {object} $request http request
-     * @param {number} $itemId id of the category to save
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @param number $itemId id of the category to save
+     * @return \app\Models\Category the updated entity
      */
     private function saveItem(Request $request, $itemId)
     {
-        $category = $this->model::findOrFail($itemId);
-        Form::updateModelFromRequest($request, $category, $this->updateFields);
-        $category->save();
+        $item = $this->model::findOrFail($itemId);
+        Form::updateModelFromRequest($request, $item, $this->updateFields);
+        $item->save();
+        return $item;
     }
 
     /**
      * get category order index, for newly created category
-     * @param {number} $parentId id of the parent category
-     * @return {number} order index
+     *
+     * @param number $parentId id of the parent category
+     * @return number order index
      */
     private function getNextOrderIndex($parentId)
     {
@@ -441,8 +457,9 @@ class CategoryController extends BaseController
 
     /**
      * get a list with all the recursive children ids of the given category ids
-     * @param {array} $ids category ids for which to get the children
-     * @return {array} a list with the unique recursive children ids
+     *
+     * @param array $ids category ids for which to get the children
+     * @return array a list with the unique recursive children ids
      */
     private function getCategoriesChildrenRecursive($ids)
     {

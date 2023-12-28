@@ -1,6 +1,12 @@
 ## About LinkManager Project
 
-LinkManager is a web application used to manage the links of a user. It is based on Laravel framework v. 9 and metronic template v. 8,
+LinkManager is a web application used to manage the links of a user.
+Technology used:
+
+-   Laravel Version 9.52.5
+-   PHP Version 8.0.9
+-   Composer Version 2.3.1
+
 Modules that it contains:
 
 -   Dashboard : info about users
@@ -48,13 +54,13 @@ Run the following commands in console (in the folder where the app is installed)
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+-   [Simple, fast routing engine](https://laravel.com/docs/routing).
+-   [Powerful dependency injection container](https://laravel.com/docs/container).
+-   Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
+-   Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
+-   Database agnostic [schema migrations](https://laravel.com/docs/migrations).
+-   [Robust background job processing](https://laravel.com/docs/queues).
+-   [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
 
 Laravel is accessible, powerful, and provides tools required for large, robust applications.
 
@@ -72,19 +78,19 @@ We would like to extend our thanks to the following sponsors for funding Laravel
 
 ### Premium Partners
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
+-   **[Vehikl](https://vehikl.com/)**
+-   **[Tighten Co.](https://tighten.co)**
+-   **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
+-   **[64 Robots](https://64robots.com)**
+-   **[Cubet Techno Labs](https://cubettech.com)**
+-   **[Cyber-Duck](https://cyber-duck.co.uk)**
+-   **[Many](https://www.many.co.uk)**
+-   **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
+-   **[DevSquad](https://devsquad.com)**
+-   **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
+-   **[OP.GG](https://op.gg)**
+-   **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
+-   **[Lendio](https://lendio.com)**
 
 ## Contributing
 
@@ -102,25 +108,14 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
 
-
-## Metronic
-
-Admin Dashboard Theme
-
-[Main site](https://keenthemes.com/metronic/)
-
 ## Used libraries & info
 
 -   **[CodeCheef - roles and permission](https://www.codecheef.org/article/user-roles-and-permissions-tutorial-in-laravel-without-packages)**
--   **[Alemoh - laravel 8 auth with fortify.](https://alemsbaja.hashnode.dev/complete-laravel-8-authentication-using-laravel-fortify-and-bootstrap-4-part-1)**
--   **[Alemoh - laravel 8 auth with fortify - github.](https://github.com/RaphAlemoh/laravel8_fortify_with_bootstrap)**
 -   **[Intervation image](https://image.intervention.io/v2)**
 -   **[Laravel socialite](https://laravel.com/docs/9.x/socialite)**
 -   **[Laravel sanctum](https://laravel.com/docs/9.x/sanctum)**
 -   **[Laravel dompdf](https://github.com/barryvdh/laravel-dompdf)**
--   **[Laravel breadcrumbs](https://packagist.org/packages/diglactic/laravel-breadcrumbs)**
--   **[Laravel datatables](https://github.com/yajra/laravel-datatables)**
 -   **[Laravel DebugBar](https://github.com/barryvdh/laravel-debugbar)**
 -   **[Laravel 9 API Authenticathion using sanctum](https://www.itsolutionstuff.com/post/laravel-9-rest-api-authentication-using-sanctum-tutorialexample.html)**
--	**[Laravel 9 API Authenticathion using passport](https://www.itsolutionstuff.com/post/laravel-9-rest-api-with-passport-authentication-tutorialexample)**
+-   **[Laravel 9 API Authenticathion using passport](https://www.itsolutionstuff.com/post/laravel-9-rest-api-with-passport-authentication-tutorialexample)**
 -   **[Laravel customize throttle message](https://thedevsaddam.github.io/post/how-to-customize-laravel-request-throttle-message-in-api-response/)**
