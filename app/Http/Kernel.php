@@ -65,5 +65,6 @@ class Kernel extends HttpKernel
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'role' => \App\Http\Middleware\RoleMiddleware::class,
         'checkstatus' => \App\Http\Middleware\CheckStatus::class,
+        'throttle.success' => \App\Http\Middleware\ThrottleSuccess::class
     ];
 }

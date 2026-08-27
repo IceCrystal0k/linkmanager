@@ -24,12 +24,20 @@ class CategoryController extends BaseController
     private $selectFields; // fields that will be updated on save
     private $filterFields;
     private $exportFields; // fields that are selected for export
+    private $userId;
 
     public function __construct()
     {
         $this->updateFields = ['name', 'parent_id', 'title', 'slug', 'content'];
         $this->selectFields = ['id', 'name', 'slug'];
         $this->exportFields = ['id', 'parent_id', 'name', 'order_index'];
+
+        $this->middleware(function ($request, $next) {
+            // $this->userId = auth()->user()->id;
+            // TODO: see if this works
+            $this->userId = auth('sanctum')->id();
+            return $next($request);
+        });
     }
 
     /**
@@ -40,7 +48,7 @@ class CategoryController extends BaseController
      */
     public function list(Request $request)
     {
-        $categoryUtils = new CategoryUtils();
+        $categoryUtils = new CategoryUtils($this->userId);
         $categoryMap = $categoryUtils->getCategoryMap();
         // $data = $categoryMap->tree;
         $exceptCategoryId = 0;
@@ -377,7 +385,7 @@ class CategoryController extends BaseController
      */
     private function validateCategoryUpdate(Request $request, $id)
     {
-        $catUtils = new CategoryUtils();
+        $catUtils = new CategoryUtils($this->userId);
         $categoryMap = $catUtils->getCategoryMap();
 
         // if parent_id is not specified, add it to the request
@@ -400,6 +408,7 @@ class CategoryController extends BaseController
     {
         $item = new $this->model();
         Form::updateModelFromRequest($request, $item, $this->updateFields);
+        $item->user_id = $this->userId;
         if (!$item->parent_id) {
             $item->parent_id = 0;
         }
@@ -463,7 +472,7 @@ class CategoryController extends BaseController
      */
     private function getCategoriesChildrenRecursive($ids)
     {
-        $catUtils = new CategoryUtils();
+        $catUtils = new CategoryUtils($this->userId);
         $categoryMap = $catUtils->getCategoryMap();
         $childrenIds = [];
         foreach ($ids as $id) {

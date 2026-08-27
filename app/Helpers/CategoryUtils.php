@@ -7,6 +7,12 @@ use App\Models\Category;
 
 class CategoryUtils
 {
+    private $userId;
+
+    public function __construct($userId)
+    {
+        $this->userId = $userId;
+    }
 
     /**
      * get a categoryMap object
@@ -15,7 +21,7 @@ class CategoryUtils
      */
     public function getCategoryMap()
     {
-        $categories = $this->getCategoriesArray();
+        $categories = $this->getCategoriesArray($this->userId);
         $categoryMap = CategoryMap::getInstance();
         $categoryMap->mapCategories($categories);
         return $categoryMap;
@@ -98,9 +104,10 @@ class CategoryUtils
      *
      * @return array list of category models
      */
-    private function getCategoriesArray()
+    private function getCategoriesArray($userId)
     {
-        $categories = Category::select(['id', 'parent_id', 'name', 'slug', 'order_index'])
+        $categories = Category::select(['id', 'user_id', 'parent_id', 'name', 'slug', 'order_index'])
+            ->where('user_id', $userId)
             ->orderBy('parent_id')
             ->orderBy('order_index')
             ->get()->toArray();

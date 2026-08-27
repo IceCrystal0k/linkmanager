@@ -1,6 +1,6 @@
 <?php
 
-use Illuminate\Http\Request;
+// use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\API\Auth\AuthController;
@@ -14,6 +14,8 @@ use App\Http\Controllers\API\Users\UserPermissionsController;
 use App\Http\Controllers\API\Users\UserRolesController;
 use App\Http\Controllers\API\Tags\TagController;
 use App\Http\Controllers\API\Links\LinkController;
+use App\Http\Controllers\API\Auth\SocialController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -26,20 +28,40 @@ use App\Http\Controllers\API\Links\LinkController;
 |
 */
 Route::controller(AuthController::class)->group(function() {
+    Route::get('sessions', 'testToken');
     Route::post('sessions', 'login');
     Route::delete('sessions', 'logout');
 });
 
-// allow only 3 actions / minute for the same session
-Route::middleware(['throttle:3,1'])->group( function () {
-    Route::controller(AccountController::class)->group(function() {
+Route::controller(SocialController::class)->group(function() {
+    Route::get('auth/google', 'redirectToGoogle');
+    Route::get('auth/google/callback', 'handleGoogleCallback');
+
+    Route::get('auth/facebook', 'redirectToFacebook');
+    Route::get('auth/facebook/callback', 'handleFacebookCallback');
+});
+
+Route::controller(AccountController::class)->group(function() {
+    // allow a user to create only one account / 10 minutes
+    Route::middleware(['throttle.success:1,10'])->group( function () {
         Route::post('accounts', 'register');
-        Route::post('accounts/requests', 'handleAccountRequests');
-        // allow users who don't have the email verified, to send emails
-        Route::middleware(['auth:sanctum'])->group( function () {
-            Route::post('accounts/emails', 'sendEmail');
-        });
     });
+
+    // allow only 3 actions / minute for the same session
+    Route::middleware(['throttle:3,1'])->group( function () {
+        Route::post('accounts/requests', 'handleAccountRequests');
+    });
+    // allow users who don't have the email verified, to send emails; only one email / 5 minutes
+    Route::middleware(['throttle:1,5', 'auth:sanctum'])->group( function () {
+        Route::post('accounts/emails', 'sendEmail');
+    });
+
+    // allow users who are not authorized, to send emails; only one email / 5 minutes
+    Route::middleware(['throttle:1,5'])->group( function () {
+        Route::post('accounts/emails-unauthorized', 'sendEmailUnauthorized');
+    });
+
+    Route::post('accounts/reset-password', 'resetPassword');
 });
 
 

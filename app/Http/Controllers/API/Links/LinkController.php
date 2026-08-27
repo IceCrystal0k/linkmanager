@@ -25,6 +25,7 @@ class LinkController extends BaseController
     private $userSettings;
     private $filterFields;
     private $exportFields; // fields that are selected for export
+    private $userId;
 
     public function __construct()
     {
@@ -34,7 +35,8 @@ class LinkController extends BaseController
         $this->exportFields = ['id', 'category_name', 'name', 'url', 'rating', 'visits', 'status_name', 'created_at'];
 
        $this->middleware(function ($request, $next) {
-            $this->userSettings = UserUtils::getUserSetting(auth('sanctum')->user()->id);
+            $this->userId = auth('sanctum')->user()->id;
+            $this->userSettings = UserUtils::getUserSetting($this->userId);
             return $next($request);
         });
     }
@@ -47,7 +49,8 @@ class LinkController extends BaseController
      */
     public function list(Request $request)
     {
-        $query = $this->model::select($this->selectFields);
+        // $selectedFields = [...$this->selectFields, 'category.category as category'];
+        $query = $this->model::with(['category'])->select($this->selectFields)->where('user_id', $this->userId);
         $query = $this->applyFilters($query, $request);
 
         $dataCount = $query->count();
@@ -364,6 +367,7 @@ class LinkController extends BaseController
     {
         $item = new $this->model();
         Form::updateModelFromRequest($request, $item, $this->updateFields);
+        $item->user_id = $this->userId;
         $item->save();
         return $item;
     }

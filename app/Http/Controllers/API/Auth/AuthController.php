@@ -2,12 +2,39 @@
 namespace App\Http\Controllers\API\Auth;
 
 use App\Enums\HttpCode;
+use App\Enums\UserRole;
 use App\Http\Controllers\API\BaseController as BaseController;
+use App\Models\UsersRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class AuthController extends BaseController
 {
+    /**
+     * Test provided token
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @return \Illuminate\Http\JsonResponse response containing the token and user information
+     */
+    public function testToken(Request $request)
+    {
+        if (auth('sanctum')->check()){
+            $authUser = auth('sanctum')->user();
+            if (!$authUser->email_verified_at) {
+                return $this->sendResponse(['verify_email_required' => true, 'email' => $authUser->email]);
+            }
+
+            $userRoles = UsersRole::where('user_id', $authUser->id)->get();
+            $response = (object)['role' => UserRole::User];
+            if ($userRoles->contains('role_id', UserRole::Admin)) {
+                $response->role = UserRole::Admin;
+            }
+            return $this->sendResponse($response);
+        } else {
+            return $this->sendEmptyResponse();
+        }
+    }
+
     /**
      * Login user
      *
@@ -18,13 +45,20 @@ class AuthController extends BaseController
     {
         if (Auth::attempt(['email' => $request->email, 'password' => $request->password])) {
             $user = Auth::user();
+            // delete all previous tokens
+            $user->tokens()->delete();
             $data = [];
+            $userRole = UsersRole::where('user_id', $user->id)->select('role_id')->first();
+
+            if (!$user->email_verified_at) {
+                $data['verify_email_required'] = true;
+            }
+
+            // create a new token
             $data['token'] = $user->createToken(env('APP_NAME'))->plainTextToken;
             $data['first_name'] = $user->first_name;
             $data['last_name'] = $user->last_name;
-            if (!$user->email_verified_at) {
-                $data['email_verified'] = false;
-            }
+            $data['role_id'] = $userRole ? $userRole->role_id : null;
             return $this->sendResponse($data, HttpCode::Created);
         } else {
             return $this->sendError(['Invalid email or password'], HttpCode::Unauthorized);

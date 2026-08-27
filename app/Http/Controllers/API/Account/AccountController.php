@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\Account;
 use App\Enums\HttpCode;
 use App\Enums\UserRole;
 use App\Helpers\Form;
+use App\Helpers\ValidationUtils;
 use App\Http\Controllers\API\BaseController as BaseController;
 use App\Mail\Account\AccountDelete;
 use App\Mail\Account\ResetPassword;
@@ -16,6 +17,7 @@ use App\Models\UsersPermission;
 use App\Models\UsersRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -62,6 +64,7 @@ class AccountController extends BaseController
         $response['first_name'] = $user->first_name;
         $response['last_name'] = $user->last_name;
         $response['email'] = $user->email;
+        $response['verify_email_required'] = true;
 
         // set user role to User
         $user->roles()->attach(UserRole::User);
@@ -145,6 +148,25 @@ class AccountController extends BaseController
                 break;
             case 'remove-account':$response = $this->sendRemoveAccountEmail();
                 break;
+            default:$response = $this->sendError(['Invalid request'], HttpCode::BadRequest);
+                break;
+        }
+        return $response;
+    }
+
+     /**
+     * Send an email for an authorized session, according to the specified action
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @return \Illuminate\Http\Response an empty response if the email was sent, or an error
+     */
+    public function sendEmailUnauthorized(Request $request)
+    {
+        if (!$request->has('action')) {
+            $this->sendError(['Invalid action request'], HttpCode::BadRequest);
+        }
+        $action = $request->has('action') ? $request->action : null;
+        switch ($action) {
             case 'reset-password':$response = $this->sendResetPasswordEmail($request);
                 break;
             default:$response = $this->sendError(['Invalid request'], HttpCode::BadRequest);
@@ -205,12 +227,14 @@ class AccountController extends BaseController
     {
         $validator = $this->validateEmail($request);
         if ($validator->failed) {
-            return $this->sendError($validator->errors, HttpCode::BadRequest);
+            return $this->sendError($validator->errors->first(), HttpCode::BadRequest);
         }
 
         $user = User::where('email', $request->email)->first();
+        // if an user doesn't exist for this email, return an empty response as well
         if (!$user) {
-            return $this->sendError(['User doesn\'t exists']);
+            // return $this->sendError(['No such email'], HttpCode::BadRequest);
+            return $this->sendEmptyResponse(HttpCode::Created);
         }
 
         // send reset password email
@@ -375,12 +399,30 @@ class AccountController extends BaseController
             // update the user password
             $user = User::where('email', $tokenItem->email)->first();
             if ($user) {
+                // if the user doesn't have the email verified, update it, since it's obvious that he has access to the email
+                if (!$user->email_verified_at) {
+                    $user->email_verified_at = \Carbon\Carbon::now();
+                }
+
                 $this->updatePassword($user, $request->password);
-                return $this->sendEmptyResponse(HttpCode::Created);
+
+                // delete the old tokens for the user
+                $user->tokens()->delete();
+                $data = [];
+                $userRole = UsersRole::where('user_id', $user->id)->select('role_id')->first();
+
+                // create a new token
+                $data['token'] = $user->createToken(env('APP_NAME'))->plainTextToken;
+                $data['first_name'] = $user->first_name;
+                $data['last_name'] = $user->last_name;
+                $data['role_id'] = $userRole ? $userRole->role_id : null;
+                return $this->sendResponse($data, HttpCode::Created);
             }
-            $error = __($this->translationPrefix . 'AccountRequestUserNotFound');
+            // $error = __($this->translationPrefix . 'AccountRequestUserNotFound');
+            return $this->sendEmptyResponse(HttpCode::Created);
         }
-        return $this->sendError([$error], HttpCode::BadRequest);
+        //return  $this->sendError([$error], HttpCode::BadRequest);
+        return $this->sendEmptyResponse(HttpCode::Created);
     }
 
     /**
@@ -458,7 +500,8 @@ class AccountController extends BaseController
     private function validateEmail(Request $request)
     {
         $rules = [
-            'email' => ['required', 'email', 'exists:users'],
+            // 'email' => ['required', 'email', 'exists:users'],
+            'email' => ['required', 'email'],
         ];
         return $this->validateRules($request, $rules);
     }
@@ -472,7 +515,7 @@ class AccountController extends BaseController
      */
     protected function validatePasswordStrength(Request $request, $validator)
     {
-        if (!$this->verifyPasswordStrength($request->password)) {
+        if (!ValidationUtils::verifyPasswordStrength($request->password)) {
             $validator->errors()->add('password', __('account.PasswordStrengthFailed'));
         }
     }
@@ -491,22 +534,6 @@ class AccountController extends BaseController
         ];
 
         return $this->validateRules($request, $rules, $this->customValidation);
-    }
-
-    /**
-     * verify password strength
-     *
-     * @param string $password
-     * @return boolean if password strength is verified, returns true, false otherwise
-     */
-    private function verifyPasswordStrength($password)
-    {
-        $uppercase = preg_match('@[A-Z]@', $password);
-        $lowercase = preg_match('@[a-z]@', $password);
-        $number = preg_match('@[0-9]@', $password);
-        $specialChars = preg_match('@[^\w]@', $password);
-
-        return $uppercase && $lowercase && $number && $specialChars;
     }
 
     /**
@@ -537,10 +564,12 @@ class AccountController extends BaseController
             return $response;
         }
 
+        $frontAppUrl = Config::get('app.front_app_url');
+
         $message = (object) [
             'name' => $user->first_name . ' ' . $user->last_name,
-            'website' => url('/'),
-            'verifyLink' => url('/') . '/account-verification/' . $accessToken,
+            'website' => $frontAppUrl,
+            'verifyLink' => $frontAppUrl . '/email-confirmation/' . $accessToken,
             'subject' => 'Account confirmation',
         ];
         try {
@@ -567,10 +596,12 @@ class AccountController extends BaseController
             return $response;
         }
 
+        $frontAppUrl = Config::get('app.front_app_url');
+
         $message = (object) [
             'name' => $user->first_name . ' ' . $user->last_name,
-            'website' => url('/'),
-            'deleteLink' => url('/') . '/account-delete/' . $accessToken,
+            'website' => $frontAppUrl,
+            'deleteLink' => $frontAppUrl . '/account-delete/' . $accessToken,
             'subject' => 'Account delete confirmation',
         ];
         try {
@@ -597,10 +628,12 @@ class AccountController extends BaseController
             return $response;
         }
 
+        $frontAppUrl = Config::get('app.front_app_url');
+
         $message = (object) [
             'email' => $user->email,
-            'website' => url('/'),
-            'resetLink' => url('/') . '/reset-password/' . $accessToken,
+            'website' => $frontAppUrl,
+            'resetLink' => $frontAppUrl . '/reset-password/' . $accessToken,
             'subject' => 'Reset password',
         ];
         try {

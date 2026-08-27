@@ -14,38 +14,14 @@
         <div class="content">
             <div class="short-description">
                 <h3>Project short description</h3>
-                An application which organize web links in different categories and subcategories.
+                A mobile application which organize web links in categories and subcategories.
 
                 <h4>Technology</h4>
                 <ol>
-                    <li>api in PHP - Laravel (see F:\laragon\www\calories)</li>
-                    <li>front in react (see F:\toptal\Uta-Cirstea-Adrian-Vasile)</li>
+                    <li>Server side : API written in PHP with Laravel. MySql DB </li>
+                    <li>front : ionic react</li>
                 </ol>
             </div>
-            <div class="references">
-                <h3>References</h3>
-                <ol>
-                    <li><a href="https://www.xrayz.co.uk/linkstash/screenshots?shot=main" target="_blank">Link stash</a>
-                    </li>
-                    <li><a href="https://www.codesolutionstuff.com/laravel-9-install-react-auth-tutorial-with-example/"
-                            target="_blank">Laravel 9 and React auth - Codesolution</a></li>
-                    <li><a href="https://www.tutsmake.com/laravel-9-react-auth-tutorial-with-example/"
-                            target="_blank">Laravel 9 and React auth - Tutsmake</a></li>
-                    <li><a href="https://www.itsolutionstuff.com/post/laravel-9-rest-api-authentication-using-sanctum-tutorialexample.html"
-                            target="_blank">Laravel 9 and React auth - ITSolutions</a></li>
-                    <li><a href="https://dev.to/emokores256/integrate-reactjs-into-laravel-9-bl2"
-                            target="_blank">Laravel 9 and React auth - Dev.To</a></li>
-                    <li><a href="https://blixtdev.com/you-dont-need-webpack-3-better-alternatives-for-building-your-javascript/"
-                            target="_blank">Webpack alternatives</a></li>
-                    <li><a href="https://blog.openreplay.com/top-five-alternatives-to-webpack/" target="_blank">Webpack
-                            alternatives - Top 5</a></li>
-                    <li><a href="https://vitejs.dev/" target="_blank">Vite JS</a></li>
-                    <li><a href="https://inertiajs.com/pages" target="_blank">inertiajs</a></li>
-                    <li><a href="https://gmail.com" target="_blank">GMail - see categories &amp; subcategories from
-                            labels</a></li>
-                </ol>
-            </div>
-
             <div class="detailed-description">
                 <h3>Detailed description</h3>
                 <ol>
@@ -56,22 +32,7 @@
                         </div>
                         <ol>
                             <li>
-                                <div class="section-title">Install Laravel &amp; sanctum </div>
-                                <ul>
-                                    <li class="completed"><a
-                                            href="https://laravel.com/docs/10.x/installation#your-first-laravel-project"
-                                            target="_blank">Install Laravel</a></li>
-                                    <li class="completed"><a
-                                            href="https://www.itsolutionstuff.com/post/laravel-9-rest-api-authentication-using-sanctum-tutorialexample.html">Install
-                                            and configure sanctum</a></li>
-                                </ul>
-                            </li>
-                            <li>
                                 <div class="section-title">Create the tables db structure</div>
-                                <div class="section-description">Use: <code
-                                        class="terminal-command">php artisan create:migration</code>. See <a
-                                        href="https://laravel.com/docs/10.x/migrations#creating-tables"
-                                        target="_blank">Laravel Database Migrations</a></div>
                                 <ul>
                                     <li class="completed">permissions : id, name, slug, timestamps</li>
                                     <li class="completed">roles : id, name, slug, timestamps</li>
@@ -86,16 +47,6 @@
                                         timestamps</li>
                                     <li class="completed">tags : id, name, timestamps</li>
                                     <li class="completed">links_tags : link_id, tag_id</li>
-                                </ul>
-                            </li>
-                            <li>
-                                <div class="section-title completed">Migrate the database</div>
-                                <ul>
-                                    <li class="completed">Run : <code
-                                            class="terminal-command">php artisan migrate</code>.<br />
-                                        Or use: <code class="terminal-command">php artisan migrate:fresh</code> to drop
-                                        all tables from the database and then execute the migrate command.
-                                    </li>
                                 </ul>
                             </li>
                             <li>

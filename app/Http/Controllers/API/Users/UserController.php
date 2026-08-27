@@ -8,6 +8,7 @@ use App\Helpers\ArrayUtils;
 use App\Helpers\ExportUtils;
 use App\Helpers\UserUtils;
 use App\Helpers\Form;
+use App\Helpers\ValidationUtils;
 use Illuminate\Http\Request;
 use App\Http\Controllers\API\BaseController as BaseController;
 use App\Models\User;
@@ -328,7 +329,7 @@ class UserController extends BaseController
      */
     private function validatePasswordStrength(Request $request, $validator)
     {
-        if (!$this->verifyPasswordStrength($request->password)) {
+        if (!ValidationUtils::verifyPasswordStrength($request->password)) {
             $validator->errors()->add('password', __('account.PasswordStrengthFailed'));
         }
     }
@@ -352,22 +353,6 @@ class UserController extends BaseController
         $item->roles()->attach($request->role);
 
         return $item;
-    }
-
-    /**
-     * function to verify a password strength
-     *
-     * @param string $password password to verify
-     * @return boolean true if password strength is correct, false otherwise
-     */
-    private function verifyPasswordStrength($password)
-    {
-        $uppercase = preg_match('@[A-Z]@', $password);
-        $lowercase = preg_match('@[a-z]@', $password);
-        $number    = preg_match('@[0-9]@', $password);
-        $specialChars = preg_match('@[^\w]@', $password);
-
-        return $uppercase && $lowercase && $number && $specialChars;
     }
 
     /**

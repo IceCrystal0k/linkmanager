@@ -22,6 +22,7 @@ class TagController extends BaseController
     private $selectFields;
     private $userSettings;
     private $filterFields;
+    private $userId;
 
     public function __construct()
     {
@@ -33,6 +34,10 @@ class TagController extends BaseController
         //     $this->userSettings = UserUtils::getUserSetting(auth('sanctum')->user()->id);
         //     return $next($request);
         // });
+        $this->middleware(function ($request, $next) {
+            $this->userId = auth('sanctum')->user()->id;
+            return $next($request);
+        });
     }
 
     /**
@@ -43,7 +48,7 @@ class TagController extends BaseController
      */
     public function list(Request $request)
     {
-        $query = $this->model::select($this->selectFields);
+        $query = $this->model::select($this->selectFields)->where('user_id', $this->userId);
         $query = $this->applyFilters($query, $request);
 
         $dataCount = $query->count();
@@ -282,6 +287,7 @@ class TagController extends BaseController
     {
         $item = new $this->model();
         Form::updateModelFromRequest($request, $item, $this->updateFields);
+        $item->user_id = $this->userId;
         $item->save();
         return $item;
     }

@@ -15,6 +15,7 @@ return new class extends Migration
     {
         Schema::create('links', function (Blueprint $table) {
             $table->increments('id');
+            $table->unsignedInteger('user_id');
             $table->unsignedInteger('category_id');
             $table->string('name', 100);
             $table->string('url');

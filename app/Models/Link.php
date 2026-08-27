@@ -28,4 +28,9 @@ class Link extends Model
         $verificationStatus = $this->verification_status ?? 0;
         return  __('status.LinkStatus.' . config('settings.link_status')[$verificationStatus]);
     }
+
+    public function category()
+    {
+        return $this->hasOne(Category::class, 'id', 'category_id')->select(['id', 'name']);
+    }
 }
