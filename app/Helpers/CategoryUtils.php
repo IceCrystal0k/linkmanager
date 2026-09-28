@@ -106,7 +106,7 @@ class CategoryUtils
      */
     private function getCategoriesArray($userId)
     {
-        $categories = Category::select(['id', 'user_id', 'parent_id', 'name', 'slug', 'order_index'])
+        $categories = Category::select(['id', 'user_id', 'module_id', 'parent_id', 'name', 'slug', 'order_index'])
             ->where('user_id', $userId)
             ->orderBy('parent_id')
             ->orderBy('order_index')

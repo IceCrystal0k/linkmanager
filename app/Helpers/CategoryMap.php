@@ -72,7 +72,7 @@ class CategoryMap
      */
     private function createTreeStructure()
     {
-        $rootNodeData = (object)['id' => 0, 'parent_id' => null, 'name' => 'Root', 'slug' => 'root', 'order_index' => 0];
+        $rootNodeData = (object)['id' => 0, 'module_id' => null, 'parent_id' => null, 'name' => 'Root', 'slug' => 'root', 'order_index' => 0];
         $tree = new CategoryMapItem($rootNodeData);
         // Loop over hash table
         foreach ($this->catListById as $item) {
@@ -104,7 +104,7 @@ class CategoryMap
      */
     private function getTreeStructureExcept($exceptId = 0)
     {
-        $rootNodeData = (object)['id' => 0, 'parent_id' => null, 'name' => 'Root', 'slug' => 'root', 'order_index' => 0];
+        $rootNodeData = (object)['id' => 0, 'module_id' => null, 'parent_id' => null, 'name' => 'Root', 'slug' => 'root', 'order_index' => 0];
         $tree = new CategoryMapItemBase($rootNodeData);
         $listById = [];
         foreach($this->categories as $item) {

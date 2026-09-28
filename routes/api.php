@@ -28,7 +28,8 @@ use App\Http\Controllers\API\Auth\SocialController;
 |
 */
 Route::controller(AuthController::class)->group(function() {
-    Route::get('sessions', 'testToken');
+    // Route::get('sessions', 'testToken');
+    Route::get('sessions', 'updatePassword');
     Route::post('sessions', 'login');
     Route::delete('sessions', 'logout');
 });

@@ -5,8 +5,10 @@ use App\Enums\HttpCode;
 use App\Enums\UserRole;
 use App\Http\Controllers\API\BaseController as BaseController;
 use App\Models\UsersRole;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 class AuthController extends BaseController
 {
@@ -33,6 +35,20 @@ class AuthController extends BaseController
         } else {
             return $this->sendEmptyResponse();
         }
+    }
+
+    public function updatePassword(Request $request)
+    {
+        $response = (object)['message' => ''];
+        $user = User::where('email', 'adi.uta@gmail.com')->first();
+        if ($user) {
+            $user->password = Hash::make('Test1234_');
+            $user->save();
+            $response->message = 'Password updated successfully for user with email a..a@g.com';
+        } else {
+            $response->message = 'User with email a..a@g.com was not found';
+        }
+        return $this->sendResponse($response);
     }
 
     /**

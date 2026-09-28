@@ -5,6 +5,7 @@ class CategoryMapItemBase
 {
     // attributes from database
     public $id;
+    public $module_id;
     public $parent_id;
     public $name;
     public $slug;
@@ -14,6 +15,7 @@ class CategoryMapItemBase
     public function __construct($category)
     {
         $this->id = $category->id;
+        $this->module_id = $category->module_id;
         $this->parent_id = $category->parent_id;
         $this->name = $category->name;
         $this->slug = $category->slug;
