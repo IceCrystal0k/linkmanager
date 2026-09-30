@@ -12,9 +12,11 @@ use App\Http\Controllers\API\Categories\CategoryController;
 use App\Http\Controllers\API\Users\UserController;
 use App\Http\Controllers\API\Users\UserPermissionsController;
 use App\Http\Controllers\API\Users\UserRolesController;
+use App\Http\Controllers\API\Users\UserModulesController;
 use App\Http\Controllers\API\Tags\TagController;
 use App\Http\Controllers\API\Links\LinkController;
 use App\Http\Controllers\API\Auth\SocialController;
+
 
 
 /*
@@ -27,14 +29,15 @@ use App\Http\Controllers\API\Auth\SocialController;
 | is assigned the "api" middleware group. Enjoy building your API!
 |
 */
-Route::controller(AuthController::class)->group(function() {
+
+Route::controller(AuthController::class)->group(function () {
     // Route::get('sessions', 'testToken');
     Route::get('sessions', 'updatePassword');
     Route::post('sessions', 'login');
     Route::delete('sessions', 'logout');
 });
 
-Route::controller(SocialController::class)->group(function() {
+Route::controller(SocialController::class)->group(function () {
     Route::get('auth/google', 'redirectToGoogle');
     Route::get('auth/google/callback', 'handleGoogleCallback');
 
@@ -42,23 +45,23 @@ Route::controller(SocialController::class)->group(function() {
     Route::get('auth/facebook/callback', 'handleFacebookCallback');
 });
 
-Route::controller(AccountController::class)->group(function() {
+Route::controller(AccountController::class)->group(function () {
     // allow a user to create only one account / 10 minutes
-    Route::middleware(['throttle.success:1,10'])->group( function () {
+    Route::middleware(['throttle.success:1,10'])->group(function () {
         Route::post('accounts', 'register');
     });
 
     // allow only 3 actions / minute for the same session
-    Route::middleware(['throttle:3,1'])->group( function () {
+    Route::middleware(['throttle:3,1'])->group(function () {
         Route::post('accounts/requests', 'handleAccountRequests');
     });
     // allow users who don't have the email verified, to send emails; only one email / 5 minutes
-    Route::middleware(['throttle:1,5', 'auth:sanctum'])->group( function () {
+    Route::middleware(['throttle:1,5', 'auth:sanctum'])->group(function () {
         Route::post('accounts/emails', 'sendEmail');
     });
 
     // allow users who are not authorized, to send emails; only one email / 5 minutes
-    Route::middleware(['throttle:1,5'])->group( function () {
+    Route::middleware(['throttle:1,5'])->group(function () {
         Route::post('accounts/emails-unauthorized', 'sendEmailUnauthorized');
     });
 
@@ -66,108 +69,111 @@ Route::controller(AccountController::class)->group(function() {
 });
 
 
-Route::middleware(['auth:sanctum', 'checkstatus'])->group( function () {
-    Route::controller(AccountController::class)->group(function() {
+Route::middleware(['auth:sanctum', 'checkstatus'])->group(function () {
+    Route::controller(AccountController::class)->group(function () {
         Route::get('accounts', 'getProfile');
         Route::put('accounts', 'updateProfile');
         Route::patch('accounts', 'partialUpdateProfile');
     });
 
-     // admin section actions
+    // admin section actions
     //  Route::group(['middleware' => 'role:admin'], function () {
 
-        // permissions actions
-        Route::controller(PermissionController::class)->group(function() {
-            Route::get('permissions', 'list');
-            Route::get('permissions/exports', 'export');
-            Route::post('permissions', 'store');
-            Route::get('permissions/{id}', 'getItem');
-            Route::put('permissions/{id}', 'update');
-            Route::delete('permissions', 'deleteSelected');
-            Route::delete('permissions/{id}', 'delete');
-        });
+    // permissions actions
+    Route::controller(PermissionController::class)->group(function () {
+        Route::get('permissions', 'list');
+        Route::get('permissions/exports', 'export');
+        Route::post('permissions', 'store');
+        Route::get('permissions/{id}', 'getItem')->whereNumber('id');
+        Route::put('permissions/{id}', 'update')->whereNumber('id');
+        Route::delete('permissions', 'deleteSelected');
+        Route::delete('permissions/{id}', 'delete')->whereNumber('id');
+    });
 
-        // role permissions actions
-        Route::controller(RolePermissionsController::class)->group(function() {
-            Route::get('roles/{id}/permissions', 'list');
-            Route::put('roles/{id}/permissions', 'update');
-            Route::get('roles/{id}/permissions/exports', 'export');
-        });
+    // role permissions actions
+    Route::controller(RolePermissionsController::class)->group(function () {
+        Route::get('roles/{id}/permissions', 'list')->whereNumber('id');
+        Route::put('roles/{id}/permissions', 'update')->whereNumber('id');
+        Route::get('roles/{id}/permissions/exports', 'export')->whereNumber('id');
+    });
 
-        // roles actions
-        Route::controller(RoleController::class)->group(function() {
-            Route::get('roles', 'list');
-            Route::get('roles/exports', 'export');
-            Route::post('roles', 'store');
-            Route::get('roles/{id}', 'getItem');
-            Route::put('roles/{id}', 'update');
-            Route::delete('roles', 'deleteSelected');
-            Route::delete('roles/{id}', 'delete');
-        });
+    // roles actions
+    Route::controller(RoleController::class)->group(function () {
+        Route::get('roles', 'list');
+        Route::get('roles/exports', 'export');
+        Route::post('roles', 'store');
+        Route::get('roles/{id}', 'getItem')->whereNumber('id');
+        Route::put('roles/{id}', 'update')->whereNumber('id');
+        Route::delete('roles', 'deleteSelected');
+        Route::delete('roles/{id}', 'delete')->whereNumber('id');
+    });
 
-        // category actions
-        Route::controller(CategoryController::class)->group(function() {
-            Route::get('categories', 'list');
-            Route::get('categories/exports', 'export');
-            Route::post('categories', 'store');
-            Route::get('categories/{id}', 'getItem');
-            Route::put('categories/{id}', 'update');
-            Route::delete('categories', 'deleteSelected');
-            Route::delete('categories/{id}', 'delete');
-        });
+    // category actions
+    Route::controller(CategoryController::class)->group(function () {
+        Route::get('categories', 'list');
+        Route::get('categories/exports', 'export');
+        Route::post('categories', 'store');
+        Route::get('categories/{id}', 'getItem')->whereNumber('id');
+        Route::put('categories/{id}', 'update')->whereNumber('id');
+        Route::delete('categories', 'deleteSelected');
+        Route::delete('categories/{id}', 'delete')->whereNumber('id');
+    });
 
 
-        // user actions
-        Route::controller(UserController::class)->group(function() {
-            Route::get('users', 'list');
-            Route::post('users', 'store');
-            Route::get('users/exports', 'export');
-            Route::get('users/{id}', 'getItem');
-            Route::put('users/{id}', 'update');
-            Route::delete('users', 'deleteSelected');
-            Route::delete('users/{id}', 'delete');
-            Route::delete('users/{id}/requests', 'handleRequests');
-        });
+    // user actions
+    Route::controller(UserController::class)->group(function () {
+        Route::get('users', 'list');
+        Route::post('users', 'store');
+        Route::get('users/exports', 'export');
+        Route::get('users/{id}', 'getItem')->whereNumber('id');
+        Route::put('users/{id}', 'update')->whereNumber('id');
+        Route::delete('users', 'deleteSelected');
+        Route::delete('users/{id}', 'delete')->whereNumber('id');
+        Route::delete('users/{id}/requests', 'handleRequests')->whereNumber('id');
+    });
 
-        // user roles actions
-        Route::controller(UserRolesController::class)->group(function() {
-            Route::get('users/{id}/roles', 'list');
-            Route::put('users/{id}/roles', 'update');
-            Route::get('users/{id}/roles/exports', 'export');
-        });
+    // user roles actions
+    Route::controller(UserRolesController::class)->group(function () {
+        Route::get('users/{id}/roles', 'list')->whereNumber('id');
+        Route::put('users/{id}/roles', 'update')->whereNumber('id');
+        Route::get('users/{id}/roles/exports', 'export')->whereNumber('id');
+    });
 
-        // user permissions actions
-        Route::controller(UserPermissionsController::class)->group(function() {
-            Route::get('users/{id}/permissions', 'list');
-            Route::put('users/{id}/permissions', 'update');
-            Route::get('users/{id}/permissions/exports', 'export');
-        });
-    // });
+    // user permissions actions
+    Route::controller(UserPermissionsController::class)->group(function () {
+        Route::get('users/{id}/permissions', 'list')->whereNumber('id');
+        Route::put('users/{id}/permissions', 'update')->whereNumber('id');
+        Route::get('users/{id}/permissions/exports', 'export')->whereNumber('id');
+    });
 
     // tags actions
-    Route::controller(TagController::class)->group(function() {
+    Route::controller(TagController::class)->group(function () {
         Route::get('tags', 'list');
         Route::get('tags/exports', 'export');
         Route::post('tags', 'store');
-        Route::get('tags/{id}', 'getItem');
-        Route::put('tags/{id}', 'update');
-        Route::delete('tags', 'deleteSelected');
-        Route::delete('tags/{id}', 'delete');
-
+        Route::get('tags/{id}', 'getItem')->whereNumber('id');
+        Route::put('tags/{id}', 'update')->whereNumber('id');
+        Route::delete('tags', 'deleteSelected')->whereNumber('id');
+        Route::delete('tags/{id}', 'delete')->whereNumber('id');
     });
 
     // links actions
-    Route::controller(LinkController::class)->group(function() {
+    Route::controller(LinkController::class)->group(function () {
         Route::get('links', 'list');
         Route::get('links/exports', 'export');
         Route::post('links', 'store');
-        Route::get('links/{id}', 'getItem');
-        Route::put('links/{id}', 'update');
+        Route::get('links/{id}', 'getItem')->whereNumber('id');
+        Route::put('links/{id}', 'update')->whereNumber('id');
         Route::delete('links', 'deleteSelected');
-        Route::delete('links/{id}', 'delete');
+        Route::delete('links/{id}', 'delete')->whereNumber('id');
     });
 
-
+    // module actions
+    Route::controller(UserModulesController::class)->group(function () {
+        Route::get('users/modules', 'list');
+        Route::put('users/modules', 'update');
+        Route::get('users/modules/exports', 'export');
+    });
 });
 
 // Route::middleware('auth:sanctum')->get('/user', function (Request $request) {

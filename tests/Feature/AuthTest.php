@@ -48,7 +48,7 @@ class AuthTest extends TestCase
      */
     public function test_loginWrongEmail()
     {
-        $response = $this->postJson('/api/sessions', ['email' => 'some@email.com', 'password' => 'Beyond1234$']);
+        $response = $this->postJson('/api/sessions', ['email' => 'some@email.com', 'password' => 'Test1234_']);
         $response->assertStatus(401)->assertJson(['errors' => ['Invalid email or password'], 'status' => 401]);
     }
 
@@ -59,7 +59,7 @@ class AuthTest extends TestCase
      */
     public function test_loginWrongPassword()
     {
-        $response = $this->postJson('/api/sessions', ['email' => 'frozen0k@gmail.com', 'password' => 'Beyond1234$a']);
+        $response = $this->postJson('/api/sessions', ['email' => 'frozen0k@gmail.com', 'password' => 'Test1234_x']);
         $response->assertStatus(401)->assertJson(['errors' => ['Invalid email or password'], 'status' => 401]);
     }
 
@@ -70,7 +70,7 @@ class AuthTest extends TestCase
      */
     public function test_loginCorrect()
     {
-        $response = $this->postJson('/api/sessions', ['email' => 'frozen0k@gmail.com', 'password' => 'Beyond1234$']);
-        $response->assertStatus(201)->assertJsonStructure(['status', 'data' => [ 'token', 'first_name', 'last_name']]);
+        $response = $this->postJson('/api/sessions', ['email' => 'frozen0k@gmail.com', 'password' => 'Test1234_']);
+        $response->assertStatus(201)->assertJsonStructure(['status', 'data' => ['token', 'first_name', 'last_name']]);
     }
 }
