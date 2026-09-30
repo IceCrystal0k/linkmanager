@@ -2,6 +2,8 @@
 namespace App\Helpers;
 
 use App\Helpers\CacheUtils;
+use Illuminate\Support\Facades\Hash;
+use App\Models\ExchangeToken;
 
 class UserUtils
 {
@@ -31,7 +33,41 @@ class UserUtils
         $cacheUtils = new CacheUtils($userId);
         $response = self::getUserSettingsFormatted($data);
         $cacheUtils->updateUserSettingsCache($response);
+    }
 
+    public static function generateToken($userId)
+    {
+        $secret = 'z$cl323M914vnm_EF32!';
+        $randPos = rand(1, strlen($secret)-2);
+        $secret = substr($secret, 0, $randPos) . $userId . substr($secret, $randPos);
+        $timeSlot = (int) (time() / 30); // 30-second window
+        $exchangeCode = hash_hmac('sha256', $timeSlot, $secret);
+        return $exchangeCode;
+    }
+
+    public static function createSocialAuthExchangeCode($target, $userId) {
+        $existingItem = ExchangeToken::where('name', $target)
+            ->where('user_id', $userId)->first();
+    
+        $token = self::generateToken($userId);
+        $expiresAt = now()->addSeconds(30);
+        if ($existingItem && $existingItem->id) {
+            $existingItem->token = $token;
+            $existingItem->expires_at = $expiresAt;
+            $existingItem->save();
+        }
+        else {
+            $saveData = ['name' => $target, 'user_id' => $userId, 'token' => $token, 'expires_at' => $expiresAt];
+            ExchangeToken::create($saveData);
+        }
+        return $token;
+    }
+
+    public static function verifySocialAuthExchangeCode($target, $userId, $token) {
+        $nowTimestamp = now();
+        $data = ExchangeToken::select('id')->where('name', $target)->where('token', $token)
+            ->where('user_id', $userId)->where('expires_at', '>', $nowTimestamp)->first();
+        return $data ? true : false;
     }
 
     private static function getUserSettingsFormatted($data)
