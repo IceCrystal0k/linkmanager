@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\API\Auth;
 
 use App\Enums\HttpCode;
@@ -35,7 +36,8 @@ class SocialController extends BaseController
         return $this->sendResponse($response);
     }
 
-    private function getResponseData() {
+    private function getResponseData()
+    {
         $user = Auth::user();
         // delete all previous tokens
         $user->tokens()->delete();
@@ -64,15 +66,16 @@ class SocialController extends BaseController
      */
     public function handleGoogleCallback(Request $request)
     {
+        $frontAppRedirectUrl = Config::get('app.front_app_url') . '/auth/social/exchange';
         try {
-            
+
             $user = Socialite::driver('google')->stateless()->user();
             $finduser = User::where('google_id', $user->id)->first();
 
             if ($finduser) {
                 Auth::login($finduser);
                 $exchangeCode = UserUtils::createSocialAuthExchangeCode('google', $finduser->id);
-                return redirect('http://localhost:4200/auth/social/exchange?exc='.$exchangeCode.'&uid='.$finduser->id);
+                return redirect($frontAppRedirectUrl . '?exc=' . $exchangeCode . '&uid=' . $finduser->id);
                 // $data = $this->getResponseData();
                 // return $this->sendResponse($data);
             } else {
@@ -106,18 +109,18 @@ class SocialController extends BaseController
                     Auth::login($createUser);
                 }
                 $exchangeCode = UserUtils::createSocialAuthExchangeCode('google', $userId);
-                return redirect('http://localhost:4200/auth/social/exchange?exc='.$exchangeCode.'&uid='.$userId);
+                return redirect($frontAppRedirectUrl . '?exc=' . $exchangeCode . '&uid=' . $userId);
 
                 // $data = $this->getResponseData();
                 // return $this->sendResponse($data);
             }
-
         } catch (Exception $e) {
             return $this->sendError($e->getMessage(), HttpCode::BadRequest);
         }
     }
 
-    public function handleTokenExchange(Request $request) {
+    public function handleTokenExchange(Request $request)
+    {
         if (!isset($request['uid']) && !isset($request['token'])) {
             return $this->sendError(['Invalid token'], HttpCode::Unauthorized);
         }
@@ -126,8 +129,7 @@ class SocialController extends BaseController
         if ($response) {
             $response = $this->getResponseData();
             return $this->sendResponse($response);
-        }
-        else {
+        } else {
             return $this->sendError(['Invalid token'], HttpCode::Unauthorized);
         }
     }
@@ -179,7 +181,6 @@ class SocialController extends BaseController
                 $data = $this->getResponseData();
                 return $this->sendResponse($data);
             }
-
         } catch (Exception $e) {
             return $this->sendError($e->getMessage(), HttpCode::BadRequest);
         }
@@ -232,8 +233,5 @@ class SocialController extends BaseController
         }
     }
 
-    private function addUserRole($userId)
-    {
-
-    }
+    private function addUserRole($userId) {}
 }
