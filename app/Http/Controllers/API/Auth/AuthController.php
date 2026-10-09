@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\API\Auth;
 
 use App\Enums\HttpCode;
@@ -20,7 +21,7 @@ class AuthController extends BaseController
      */
     public function testToken(Request $request)
     {
-        if (auth('sanctum')->check()){
+        if (auth('sanctum')->check()) {
             $authUser = auth('sanctum')->user();
             if (!$authUser->email_verified_at) {
                 return $this->sendResponse(['verify_email_required' => true, 'email' => $authUser->email]);
@@ -40,13 +41,13 @@ class AuthController extends BaseController
     public function updatePassword(Request $request)
     {
         $response = (object)['message' => ''];
-        $user = User::where('email', 'adi.uta@gmail.com')->first();
+        $user = User::where('email', 'frozen0k@gmail.com')->first();
         if ($user) {
             $user->password = Hash::make('Test1234_');
             $user->save();
-            $response->message = 'Password updated successfully for user with email a..a@g.com';
+            $response->message = 'Password updated successfully for user with email f..k@g.com';
         } else {
-            $response->message = 'User with email a..a@g.com was not found';
+            $response->message = 'User with email f..k@g.com was not found';
         }
         return $this->sendResponse($response);
     }
