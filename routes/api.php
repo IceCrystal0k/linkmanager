@@ -40,6 +40,7 @@ Route::controller(AuthController::class)->group(function () {
 Route::controller(SocialController::class)->group(function () {
     Route::get('auth/google', 'redirectToGoogle');
     Route::get('auth/google/callback', 'handleGoogleCallback');
+    Route::post('auth/social/exchange', 'handleTokenExchange');
 
     Route::get('auth/facebook', 'redirectToFacebook');
     Route::get('auth/facebook/callback', 'handleFacebookCallback');

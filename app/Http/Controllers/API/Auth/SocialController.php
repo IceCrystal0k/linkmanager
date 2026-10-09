@@ -1,8 +1,10 @@
 <?php
+
 namespace App\Http\Controllers\API\Auth;
 
 use App\Enums\HttpCode;
 use App\Enums\UserRole;
+use App\Helpers\UserUtils;
 use App\Http\Controllers\API\BaseController as BaseController;
 use App\Models\Timezone;
 use App\Models\User;
@@ -34,8 +36,11 @@ class SocialController extends BaseController
         return $this->sendResponse($response);
     }
 
-    private function getResponseData() {
-        $user = Auth::user();
+    private function getResponseData(int $userId)
+    {
+        $user = User::find($userId);
+        Auth::login($user);
+        // $user = Auth::user();
         // delete all previous tokens
         $user->tokens()->delete();
         $data = [];
@@ -63,21 +68,27 @@ class SocialController extends BaseController
      */
     public function handleGoogleCallback(Request $request)
     {
+        $frontAppRedirectUrl = Config::get('app.front_app_url') . '/auth/social/exchange';
         try {
-            $user = Socialite::driver('google')->with(['code' => $request['code']])->stateless()->user();
+
+            $user = Socialite::driver('google')->stateless()->user();
             $finduser = User::where('google_id', $user->id)->first();
 
             if ($finduser) {
-                Auth::login($finduser);
-                $data = $this->getResponseData();
-                return $this->sendResponse($data);
+                // Auth::login($finduser);
+                // $data = $this->getResponseData();
+                // return $this->sendResponse($data);
+                $exchangeCode = UserUtils::createSocialAuthExchangeCode('google', $finduser->id);
+                return redirect($frontAppRedirectUrl . '?exc=' . $exchangeCode . '&uid=' . $finduser->id);
             } else {
                 // check for existing user, maybe it logged in with facebook account before
+                $userId = 0;
                 $userModel = User::where('email', $user->email)->first();
                 if ($userModel) {
+                    $userId = $userModel->id;
                     $userModel->google_id = $user->id;
                     $userModel->save();
-                    Auth::login($userModel);
+                    // Auth::login($userModel);
                 } else {
                     $name = $this->extractNameFromEmail($user->email);
                     $password = Hash::make(Str::random(8));
@@ -92,18 +103,38 @@ class SocialController extends BaseController
                     $createUser->email_verified_at = \Carbon\Carbon::now();
                     $createUser->save();
 
+                    $userId = $createUser->id;
                     $this->saveSessionTimezone($createUser->id);
                     // set user role to User
                     $createUser->roles()->attach(UserRole::User);
 
-                    Auth::login($createUser);
+                    // Auth::login($createUser);
                 }
-                $data = $this->getResponseData();
-                return $this->sendResponse($data);
-            }
+                $exchangeCode = UserUtils::createSocialAuthExchangeCode('google', $userId);
+                return redirect($frontAppRedirectUrl . '?exc=' . $exchangeCode . '&uid=' . $userId);
 
+                // $data = $this->getResponseData();
+                // return $this->sendResponse($data);
+            }
         } catch (Exception $e) {
             return $this->sendError($e->getMessage(), HttpCode::BadRequest);
+        }
+    }
+
+    public function handleTokenExchange(Request $request)
+    {
+        if (!isset($request['uid']) && !isset($request['token'])) {
+            return $this->sendError(['Invalid token'], HttpCode::Unauthorized);
+        }
+
+        $userId = (int)$request['uid'];
+        $response = UserUtils::verifySocialAuthExchangeCode('google', $userId, $request['token']);
+        if ($response) {
+            $response = $this->getResponseData($userId);
+            UserUtils::deleteSocialAuthExchangeCode('google', $userId);
+            return $this->sendResponse($response);
+        } else {
+            return $this->sendError(['Invalid token'], HttpCode::Unauthorized);
         }
     }
 
@@ -116,21 +147,26 @@ class SocialController extends BaseController
 
     public function handleFacebookCallback(Request $request)
     {
+        $frontAppRedirectUrl = Config::get('app.front_app_url') . '/auth/social/exchange';
         try {
             $user = Socialite::driver('facebook')->with(['code' => $request['code']])->stateless()->user();
             $finduser = User::where('fb_id', $user->id)->first();
 
             if ($finduser) {
-                Auth::login($finduser);
-                $data = $this->getResponseData();
-                return $this->sendResponse($data);
+                // Auth::login($finduser);
+                // $data = $this->getResponseData();
+                // return $this->sendResponse($data);
+                $exchangeCode = UserUtils::createSocialAuthExchangeCode('facebook', $finduser->id);
+                return redirect($frontAppRedirectUrl . '?exc=' . $exchangeCode . '&uid=' . $finduser->id);
             } else {
-                // check for existing user, maybe it logged in with google account before
+                // check for existing user, maybe it logged in with facebook account before
+                $userId = 0;
                 $userModel = User::where('email', $user->email)->first();
                 if ($userModel) {
+                    $userId = $userModel->id;
                     $userModel->fb_id = $user->id;
                     $userModel->save();
-                    Auth::login($userModel);
+                    // Auth::login($userModel);
                 } else {
                     $name = $this->extractNameFromFacebook($user->name);
                     $password = Hash::make(Str::random(8));
@@ -145,22 +181,25 @@ class SocialController extends BaseController
                     $createUser->email_verified_at = \Carbon\Carbon::now();
                     $createUser->save();
 
+                    $userId = $createUser->id;
                     $this->saveSessionTimezone($createUser->id);
                     // set user role to User
                     $createUser->roles()->attach(UserRole::User);
-                    Auth::login($createUser);
+                    // Auth::login($createUser);
                 }
 
-                $data = $this->getResponseData();
-                return $this->sendResponse($data);
-            }
+                $exchangeCode = UserUtils::createSocialAuthExchangeCode('facebook', $userId);
+                return redirect($frontAppRedirectUrl . '?exc=' . $exchangeCode . '&uid=' . $userId);
 
+                // $data = $this->getResponseData();
+                // return $this->sendResponse($data);
+            }
         } catch (Exception $e) {
             return $this->sendError($e->getMessage(), HttpCode::BadRequest);
         }
     }
 
-    private function extractNameFromEmail($email)
+    private function extractNameFromEmail(string $email)
     {
         $userName = substr($email, 0, strpos($email, '@'));
         $symbols = ['.', '_', '-'];
@@ -177,7 +216,7 @@ class SocialController extends BaseController
         return ['firstName' => $firstName, 'lastName' => $lastName];
     }
 
-    private function extractNameFromFacebook($userName)
+    private function extractNameFromFacebook(string $userName)
     {
         $symbols = [' ', '.', '_', '-'];
         $firstName = $userName;
@@ -193,7 +232,7 @@ class SocialController extends BaseController
         return ['firstName' => $firstName, 'lastName' => $lastName];
     }
 
-    private function saveSessionTimezone($userId)
+    private function saveSessionTimezone(int $userId)
     {
         $timezoneOffset = Session::get('timezone-offset');
         if ($timezoneOffset) {
@@ -207,8 +246,5 @@ class SocialController extends BaseController
         }
     }
 
-    private function addUserRole($userId)
-    {
-
-    }
+    private function addUserRole($userId) {}
 }
