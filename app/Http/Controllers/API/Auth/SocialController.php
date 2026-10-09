@@ -127,9 +127,11 @@ class SocialController extends BaseController
             return $this->sendError(['Invalid token'], HttpCode::Unauthorized);
         }
 
-        $response = UserUtils::verifySocialAuthExchangeCode('google', $request['uid'], $request['token']);
+        $userId = (int)$request['uid'];
+        $response = UserUtils::verifySocialAuthExchangeCode('google', $userId, $request['token']);
         if ($response) {
-            $response = $this->getResponseData($request['uid']);
+            $response = $this->getResponseData($userId);
+            UserUtils::deleteSocialAuthExchangeCode('google', $userId);
             return $this->sendResponse($response);
         } else {
             return $this->sendError(['Invalid token'], HttpCode::Unauthorized);
