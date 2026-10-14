@@ -77,7 +77,7 @@ class UserModulesController extends BaseController
         // create the modules array and set the attributes
         $userModulesList = [];
         foreach ($userModules as $userModule) {
-            $module = isset($modulesIndexed[$userModule->id]) ? $modulesIndexed[$userModule->id] : null;
+            $module = isset($modulesIndexed[$userModule->module_id]) ? $modulesIndexed[$userModule->module_id] : null;
             if ($module) {
                 $userModuleItem = (object) [
                     'id' => $module['id'],

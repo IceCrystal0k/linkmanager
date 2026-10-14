@@ -27,6 +27,11 @@ class CategoryUtils
         return $categoryMap;
     }
 
+    public function getCategoryList()
+    {
+        return $this->getCategoriesArray($this->userId);
+    }
+
     /**
      * group files by category
      *
