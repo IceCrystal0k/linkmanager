@@ -20,15 +20,15 @@ class CategoryController extends BaseController
     protected $exportFileName = 'categories';
     protected $translationPrefix = 'category.';
     protected $model = 'App\Models\Category';
-    private $updateFields; // fields that will be updated on save
-    private $selectFields; // fields that will be updated on save
-    private $filterFields;
-    private $exportFields; // fields that are selected for export
+    private array $updateFields; // fields that will be updated on save
+    private array $selectFields; // fields that will be updated on save
+    private object $filterFields;
+    private array $exportFields; // fields that are selected for export
     private $userId;
 
     public function __construct()
     {
-        $this->updateFields = ['name', 'parent_id', 'title', 'slug', 'content'];
+        $this->updateFields = ['name', 'module_id', 'parent_id', 'title', 'slug', 'content'];
         $this->selectFields = ['id', 'name', 'slug'];
         $this->exportFields = ['id', 'parent_id', 'name', 'order_index'];
 
@@ -49,15 +49,21 @@ class CategoryController extends BaseController
     public function list(Request $request)
     {
         $categoryUtils = new CategoryUtils($this->userId);
+        $categoryList = $categoryUtils->getCategoryList();
+        $dataCount = count($categoryList);
+        return $this->sendResponse($categoryList, HttpCode::OK, ['totalCount' => $dataCount]);
+    }
+
+    public function tree(Request $request)
+    {
+        $categoryUtils = new CategoryUtils($this->userId);
         $categoryMap = $categoryUtils->getCategoryMap();
-        // $data = $categoryMap->tree;
         $exceptCategoryId = 0;
         if ($request->has('exceptCategoryId')) {
             $exceptCategoryId = (int)$request->exceptCategoryId;
         }
         $data = $categoryMap->getTreeExcept($exceptCategoryId);
-        $dataCount = $categoryMap->getCategoriesCount();
-        return $this->sendResponse($data, HttpCode::OK, ['totalCount' => $dataCount]);
+        return $this->sendResponse($data);
     }
 
     /**
@@ -69,9 +75,11 @@ class CategoryController extends BaseController
     public function actions(Request $request)
     {
         switch ($request->ajaxAction) {
-            case 'getNodeChildren':return $this->getTreeData();
+            case 'getNodeChildren':
+                return $this->getTreeData();
                 break;
-            case 'move':return $this->moveCategoryItem($request);
+            case 'move':
+                return $this->moveCategoryItem($request);
                 break;
         }
     }
@@ -95,7 +103,7 @@ class CategoryController extends BaseController
     /**
      * category get item
      *
-     * @param number $id category id
+     * @param int $id category id
      * @return \Illuminate\Http\JsonResponse a json response, with the entity if found, otherwise throws a 404 not found
      */
     public function getItem($id)
@@ -109,7 +117,7 @@ class CategoryController extends BaseController
      * update category in database
      *
      * @param \Illuminate\Http\Request $request user request
-     * @param number $id category id to update
+     * @param int $id category id to update
      * @return \Illuminate\Http\JsonResponse a json response with the updated category or a Bad request with errors, if failed
      */
     public function update(Request $request, $id)
@@ -126,7 +134,7 @@ class CategoryController extends BaseController
     /**
      * delete category and all children and grand children of the category
      *
-     * @param number $id category id
+     * @param int $id category id
      * @return \Illuminate\Http\Response an empty response, which specifies if the entity was deleted or 404 not found if the entity was not found
      */
     public function delete($id)
@@ -161,7 +169,7 @@ class CategoryController extends BaseController
         return $this->sendEmptyResponse(HttpCode::NoContent);
     }
 
-     /**
+    /**
      * validate export params
      *
      * @param \Illuminate\Http\Request $request user request, must contain: export_format
@@ -210,8 +218,8 @@ class CategoryController extends BaseController
     /**
      * verify that the specified categoryId and the new parentId exists in the database
      *
-     * @param number $categoryId id of the category which is moved
-     * @param number $newParentId id of the category where to move
+     * @param int $categoryId id of the category which is moved
+     * @param int $newParentId id of the category where to move
      * @param object $categoryMap an object of type CategoryMap
      * @return object response containing { valid, error }
      */
@@ -249,7 +257,7 @@ class CategoryController extends BaseController
      * if the new parent (from dataSave) is the same as categoryId or is a child of categoryId, return error
      *
      * @param \app\Helpers\CategoryMapItem $category category which is moved
-     * @param number $newParentId id of the category where to move
+     * @param int $newParentId id of the category where to move
      * @return object response containing { valid, error }
      */
     private function verifyMoveDataIntegrity($category, $newParentId)
@@ -282,7 +290,7 @@ class CategoryController extends BaseController
     /**
      * get category model for edit; throws a 404 not found exception if item not found in database
      *
-     * @param number $itemId category id of the category for which to get the data
+     * @param int $itemId category id of the category for which to get the data
      * @return \app\Models\Category category model
      */
     private function getItemForEdit($itemId)
@@ -323,7 +331,7 @@ class CategoryController extends BaseController
      * validate item request before create / save
      *
      * @param \Illuminate\Http\Request $request user request
-     * @param number $id category id
+     * @param int $id category id
      * @return object an object with the fields { failed, errors }
      */
     private function validateItemRequest(Request $request, $id = null)
@@ -345,13 +353,12 @@ class CategoryController extends BaseController
 
         // when creating a new category, validate that the parent id is either 0 or is an id that exists in the database
         if (!$id) {
-            $customValidation = function($request, $validator) {
+            $customValidation = function ($request, $validator) {
                 $this->validateParentData($request);
             };
-        }
-        else {
+        } else {
             // when editing, validate that request is valid and that parent id is not the same as the moved category or a child of the moved category
-            $customValidation = function($request, $validator) use ($id) {
+            $customValidation = function ($request, $validator) use ($id) {
                 $validation = $this->validateCategoryUpdate($request, $id);
                 if (!$validation->valid) {
                     $validator->errors()->add('parent_id', $validation->error);
@@ -380,7 +387,7 @@ class CategoryController extends BaseController
      * validate request for edit, so that the parent won't be the same category or a child category
      *
      * @param \Illuminate\Http\Request $request user request
-     * @param number $id category id
+     * @param int $id category id
      * @return object an object with the fields { failed, errors }
      */
     private function validateCategoryUpdate(Request $request, $id)
@@ -422,7 +429,7 @@ class CategoryController extends BaseController
      * update category in database, from provided request
      *
      * @param \Illuminate\Http\Request $request user request
-     * @param number $itemId id of the category to save
+     * @param int $itemId id of the category to save
      * @return \app\Models\Category the updated entity
      */
     private function saveItem(Request $request, $itemId)
@@ -436,8 +443,8 @@ class CategoryController extends BaseController
     /**
      * get category order index, for newly created category
      *
-     * @param number $parentId id of the parent category
-     * @return number order index
+     * @param int $parentId id of the parent category
+     * @return int order index
      */
     private function getNextOrderIndex($parentId)
     {

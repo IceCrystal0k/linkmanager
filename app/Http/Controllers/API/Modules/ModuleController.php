@@ -20,12 +20,12 @@ class ModuleController extends BaseController
     protected $exportFileName = 'modules';
     protected $translationPrefix = 'modules.';
     protected $model = 'App\Models\Module';
-    private $updateFields; // fields that will be updated on save
-    private $selectFields;
-    private $userSettings;
-    private $filterFields;
-    private $exportFields; // fields that are selected for export
-    private $userId;
+    private array $updateFields; // fields that will be updated on save
+    private array $selectFields;
+    private object $userSettings;
+    private array $filterFields;
+    private array $exportFields; // fields that are selected for export
+    private int $userId;
 
     public function __construct()
     {
@@ -34,7 +34,7 @@ class ModuleController extends BaseController
         $this->filterFields = ['search', 'name', 'slug', 'description', 'order_index', 'enabled', 'created_at'];
         $this->exportFields = ['id', 'name', 'slug', 'description', 'order_index', 'enabled', 'icon', 'created_at'];
 
-       $this->middleware(function ($request, $next) {
+        $this->middleware(function ($request, $next) {
             $this->userId = auth('sanctum')->user()->id;
             $this->userSettings = UserUtils::getUserSetting($this->userId);
             return $next($request);
@@ -107,15 +107,13 @@ class ModuleController extends BaseController
                         }
                         if ($filterData->min && $filterData->max) {
                             $filteredQuery = $filteredQuery->whereBetween($filterKey, [$filterData->min, $filterData->max]);
-                        }
-                        else if ($filterData->min) {
+                        } else if ($filterData->min) {
                             $filteredQuery = $filteredQuery->where($filterKey, '>=', $filterData->min);
-                        }
-                        else if ($filterData->max) {
+                        } else if ($filterData->max) {
                             $filteredQuery = $filteredQuery->where($filterKey, '<=', $filterData->max);
                         }
                         break;
-                    break;
+                        break;
                 }
             }
         }
@@ -277,8 +275,16 @@ class ModuleController extends BaseController
         $exportStatus = $request->has('export_status') ? $request->export_status : null;
 
         $query = $this->model::leftJoin('categories', 'categories.id', '=', 'links.category_id')
-            ->select(['links.id', 'categories.name as category_name', 'links.name', 'url',
-                'rating', 'visits', 'verification_status', 'links.created_at']);
+            ->select([
+                'links.id',
+                'categories.name as category_name',
+                'links.name',
+                'url',
+                'rating',
+                'visits',
+                'verification_status',
+                'links.created_at'
+            ]);
 
         if ($exportDateRange) {
             list($dateStart, $dateEnd) = explode(' - ', $exportDateRange);
@@ -320,8 +326,16 @@ class ModuleController extends BaseController
      */
     private function getCsvContent($data)
     {
-        $columnList = [__('tables.Id'), __('tables.Category'), __('tables.Name'), __('tables.Url'), __('tables.Rating'),
-        __('tables.Visits'), __('tables.Status'), __('tables.CreatedAt')];
+        $columnList = [
+            __('tables.Id'),
+            __('tables.Category'),
+            __('tables.Name'),
+            __('tables.Url'),
+            __('tables.Rating'),
+            __('tables.Visits'),
+            __('tables.Status'),
+            __('tables.CreatedAt')
+        ];
 
         return ExportUtils::getCsvContent($data, $columnList, $this->exportFields);
     }
@@ -388,5 +402,4 @@ class ModuleController extends BaseController
     }
 
     /** functions used to create / update role - END */
-
 }
