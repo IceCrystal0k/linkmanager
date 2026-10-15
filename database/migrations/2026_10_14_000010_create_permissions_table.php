@@ -3,28 +3,23 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\DB;
 
-class CreatePermissionsTable extends Migration
-{
-    /**
-     * Run the migrations.
-     *
-     * @return void
-     */
-    public function up()
+return new class extends Migration {
+    public function up(): void
     {
         Schema::create('permissions', function (Blueprint $table) {
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
             $table->increments('id');
-            $table->string('name'); // edit posts
-            $table->string('slug'); //edit-posts
+            $table->string('name');
+            $table->string('slug');
             $table->timestamps();
         });
-
-        $this->fillPermissions();
+		
+		$this->fillPermissions();
     }
-
-    private function fillPermissions()
+	
+	 private function fillPermissions()
     {
         $data = [
             [
@@ -63,13 +58,8 @@ class CreatePermissionsTable extends Migration
         DB::table('permissions')->insert($data);
     }
 
-    /**
-     * Reverse the migrations.
-     *
-     * @return void
-     */
-    public function down()
+    public function down(): void
     {
         Schema::dropIfExists('permissions');
     }
-}
+};
