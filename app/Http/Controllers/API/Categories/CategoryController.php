@@ -345,9 +345,12 @@ class CategoryController extends BaseController
 
         $rules = [
             'name' => ['required', 'string', 'max:255', $uniqueName],
-            'slug' => ['required', 'string', 'max:255', $uniqueSlug],
-            'parent_id' => ['required', 'numeric']
+            'slug' => ['required', 'string', 'max:255', $uniqueSlug]
         ];
+
+        if (!empty($request['parent_id'])) {
+            $rules['parent_id'] = 'numeric';
+        }
 
 
 
@@ -417,7 +420,7 @@ class CategoryController extends BaseController
         Form::updateModelFromRequest($request, $item, $this->updateFields);
         $item->user_id = $this->userId;
         if (!$item->parent_id) {
-            $item->parent_id = 0;
+            $item->parent_id = null;
         }
 
         $item->order_index = $this->getNextOrderIndex($item->parent_id);
@@ -448,6 +451,9 @@ class CategoryController extends BaseController
      */
     private function getNextOrderIndex($parentId)
     {
+        if (!$parentId) {
+            return 1;
+        }
         $orderIndex = $this->model::where('parent_id', $parentId)->max('order_index');
         if (!$orderIndex) {
             $orderIndex = 1;
