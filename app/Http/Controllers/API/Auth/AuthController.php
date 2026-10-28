@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Config;
 
 class AuthController extends BaseController
 {
@@ -72,7 +73,8 @@ class AuthController extends BaseController
             }
 
             // create a new token
-            $data['token'] = $user->createToken(env('APP_NAME'))->plainTextToken;
+            $appName = Config::get('app.name');
+            $data['token'] = $user->createToken($appName)->plainTextToken;
             $data['first_name'] = $user->first_name;
             $data['last_name'] = $user->last_name;
             $data['role_id'] = $userRole ? $userRole->role_id : null;

@@ -60,7 +60,8 @@ class AccountController extends BaseController
 
         // create a custom response
         $response = [];
-        $response['token'] = $user->createToken(env('APP_NAME'))->plainTextToken;
+        $appName = Config::get('app.name');
+        $response['token'] = $user->createToken($appName)->plainTextToken;
         $response['first_name'] = $user->first_name;
         $response['last_name'] = $user->last_name;
         $response['email'] = $user->email;
@@ -144,17 +145,20 @@ class AccountController extends BaseController
         }
         $action = $request->has('action') ? $request->action : null;
         switch ($action) {
-            case 'verify-email':$response = $this->sendVerificationEmail();
+            case 'verify-email':
+                $response = $this->sendVerificationEmail();
                 break;
-            case 'remove-account':$response = $this->sendRemoveAccountEmail();
+            case 'remove-account':
+                $response = $this->sendRemoveAccountEmail();
                 break;
-            default:$response = $this->sendError(['Invalid request'], HttpCode::BadRequest);
+            default:
+                $response = $this->sendError(['Invalid request'], HttpCode::BadRequest);
                 break;
         }
         return $response;
     }
 
-     /**
+    /**
      * Send an email for an authorized session, according to the specified action
      *
      * @param \Illuminate\Http\Request $request user request
@@ -167,9 +171,11 @@ class AccountController extends BaseController
         }
         $action = $request->has('action') ? $request->action : null;
         switch ($action) {
-            case 'reset-password':$response = $this->sendResetPasswordEmail($request);
+            case 'reset-password':
+                $response = $this->sendResetPasswordEmail($request);
                 break;
-            default:$response = $this->sendError(['Invalid request'], HttpCode::BadRequest);
+            default:
+                $response = $this->sendError(['Invalid request'], HttpCode::BadRequest);
                 break;
         }
         return $response;
@@ -260,17 +266,23 @@ class AccountController extends BaseController
 
         $action = $request->has('action') ? $request->action : null;
         switch ($action) {
-            case 'confirm-email':$response = $this->confirmAccountVerification($request);
+            case 'confirm-email':
+                $response = $this->confirmAccountVerification($request);
                 break;
-            case 'remove-account':$response = $this->removeAccount($request);
+            case 'remove-account':
+                $response = $this->removeAccount($request);
                 break;
-            case 'token-info':$response = $this->getTokenInfo($request);
+            case 'token-info':
+                $response = $this->getTokenInfo($request);
                 break;
-            case 'reset-password':$response = $this->resetPassword($request);
+            case 'reset-password':
+                $response = $this->resetPassword($request);
                 break;
-            case 'update-password':$response = $this->updateUserPassword($request);
+            case 'update-password':
+                $response = $this->updateUserPassword($request);
                 break;
-            default:$response = $this->sendError(['Invalid request'], HttpCode::BadRequest);
+            default:
+                $response = $this->sendError(['Invalid request'], HttpCode::BadRequest);
                 break;
         }
         return $response;
@@ -412,7 +424,8 @@ class AccountController extends BaseController
                 $userRole = UsersRole::where('user_id', $user->id)->select('role_id')->first();
 
                 // create a new token
-                $data['token'] = $user->createToken(env('APP_NAME'))->plainTextToken;
+                $appName = Config::get('app.name');
+                $data['token'] = $user->createToken($appName)->plainTextToken;
                 $data['first_name'] = $user->first_name;
                 $data['last_name'] = $user->last_name;
                 $data['role_id'] = $userRole ? $userRole->role_id : null;
@@ -753,9 +766,11 @@ class AccountController extends BaseController
     {
         $key = '';
         switch ($action) {
-            case 'remove-account':$key = 'AccountDeletedMailFrequency';
+            case 'remove-account':
+                $key = 'AccountDeletedMailFrequency';
                 break;
-            case 'verify-email':$key = 'AccountVerifyMailFrequency';
+            case 'verify-email':
+                $key = 'AccountVerifyMailFrequency';
                 break;
         }
         return __($this->translationPrefix . $key);

@@ -34,7 +34,7 @@ class LinkController extends BaseController
         $this->filterFields = ['search', 'name', 'category_id', 'url', 'description', 'comment', 'rating', 'visits', 'verification_status', 'created_at'];
         $this->exportFields = ['id', 'category_name', 'name', 'url', 'rating', 'visits', 'status_name', 'created_at'];
 
-       $this->middleware(function ($request, $next) {
+        $this->middleware(function ($request, $next) {
             $this->userId = auth('sanctum')->user()->id;
             $this->userSettings = UserUtils::getUserSetting($this->userId);
             return $next($request);
@@ -107,15 +107,13 @@ class LinkController extends BaseController
                         }
                         if ($filterData->min && $filterData->max) {
                             $filteredQuery = $filteredQuery->whereBetween($filterKey, [$filterData->min, $filterData->max]);
-                        }
-                        else if ($filterData->min) {
+                        } else if ($filterData->min) {
                             $filteredQuery = $filteredQuery->where($filterKey, '>=', $filterData->min);
-                        }
-                        else if ($filterData->max) {
+                        } else if ($filterData->max) {
                             $filteredQuery = $filteredQuery->where($filterKey, '<=', $filterData->max);
                         }
                         break;
-                    break;
+                        break;
                 }
             }
         }
@@ -277,8 +275,16 @@ class LinkController extends BaseController
         $exportStatus = $request->has('export_status') ? $request->export_status : null;
 
         $query = $this->model::leftJoin('categories', 'categories.id', '=', 'links.category_id')
-            ->select(['links.id', 'categories.name as category_name', 'links.name', 'url',
-                'rating', 'visits', 'verification_status', 'links.created_at']);
+            ->select([
+                'links.id',
+                'categories.name as category_name',
+                'links.name',
+                'url',
+                'rating',
+                'visits',
+                'verification_status',
+                'links.created_at'
+            ]);
 
         if ($exportDateRange) {
             list($dateStart, $dateEnd) = explode(' - ', $exportDateRange);
@@ -320,8 +326,16 @@ class LinkController extends BaseController
      */
     private function getCsvContent($data)
     {
-        $columnList = [__('tables.Id'), __('tables.Category'), __('tables.Name'), __('tables.Url'), __('tables.Rating'),
-        __('tables.Visits'), __('tables.Status'), __('tables.CreatedAt')];
+        $columnList = [
+            __('tables.Id'),
+            __('tables.Category'),
+            __('tables.Name'),
+            __('tables.Url'),
+            __('tables.Rating'),
+            __('tables.Visits'),
+            __('tables.Status'),
+            __('tables.CreatedAt')
+        ];
 
         return ExportUtils::getCsvContent($data, $columnList, $this->exportFields);
     }
@@ -369,6 +383,7 @@ class LinkController extends BaseController
         Form::updateModelFromRequest($request, $item, $this->updateFields);
         $item->user_id = $this->userId;
         $item->save();
+        $item->category = $item->category()->first();
         return $item;
     }
 
@@ -384,9 +399,9 @@ class LinkController extends BaseController
         $item = $this->model::findOrFail($itemId);
         Form::updateModelFromRequest($request, $item, $this->updateFields);
         $item->save();
+        $item->category = $item->category()->first();
         return $item;
     }
 
     /** functions used to create / update role - END */
-
 }
