@@ -51,4 +51,7 @@ return [
         1 => 'verified',
         2 => 'failed',
     ],
+    'user_avatar_path' => '/users/avatars/',
+    'user_avatar_max_size' => 2048, // in KB
+    'user_avatar_allowed_extensions' => ['jpg', 'jpeg', 'png', 'gif']
 ];

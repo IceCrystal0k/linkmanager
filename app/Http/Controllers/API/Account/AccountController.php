@@ -16,8 +16,10 @@ use App\Models\UserInfo;
 use App\Models\UsersPermission;
 use App\Models\UsersRole;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -111,6 +113,39 @@ class AccountController extends BaseController
         return $this->sendResponse($response);
     }
 
+    public function updateAvatar(User $user, UploadedFile $avatar)
+    {
+        $userInfo = $user->userInfo;
+        if (!$userInfo) {
+            $userInfo = new UserInfo();
+            $userInfo->user_id = $user->id;
+        }
+
+        $avatarFilename = 'user_' . $user->id . '.' . $avatar->extension();
+        $avatarPath = $avatar->storeAs(config('settings.user_avatar_path'), $avatarFilename, 'public');
+        if ($avatarPath === false) {
+            throw new \RuntimeException('Unable to store uploaded avatar.');
+        }
+
+        $userInfo->avatar = $avatarFilename;
+        $userInfo->save();
+    }
+
+    public function deleteAvatar(User $user)
+    {
+        $userInfo = $user->userInfo;
+        if (!$userInfo) {
+            return; // No avatar to delete
+        }
+
+        if ($userInfo->avatar && !Storage::disk('public')->delete(config('settings.user_avatar_path') . $userInfo->avatar)) {
+            throw new \RuntimeException('Unable to delete stored avatar.');
+        }
+
+        $userInfo->avatar = '';
+        $userInfo->save();
+    }
+
     /**
      * Partial update account data
      *
@@ -126,8 +161,21 @@ class AccountController extends BaseController
 
         $authUser = auth('sanctum')->user();
         $user = User::findOrFail($authUser->id);
-        Form::updateModelFromRequest($request, $user, $this->partialUpdateFields);
+        Form::updateModelFromRequest($request, $user, array_merge($this->updateFields, $this->partialUpdateFields));
         $user->save();
+        if ($request->hasFile('avatar')) {
+            $this->updateAvatar($user, $request->file('avatar'));
+            $avatar = null;
+            if ($user->userInfo && $user->userInfo->avatar) {
+                $avatar = config('settings.user_avatar_path') . $user->userInfo->avatar;
+                $user->userInfo->avatar = Storage::disk('public')->url($avatar);
+            }
+        } else if ($request->has('avatar_deleted')) {
+            $this->deleteAvatar($user);
+            if ($user->userInfo) {
+                $user->userInfo->avatar_deleted = 1;
+            }
+        }
         $response = $user;
         return $this->sendResponse($response);
     }
@@ -498,8 +546,11 @@ class AccountController extends BaseController
     private function validatePartialUpdate(Request $request)
     {
         $rules = [
-            'fb_id' => ['required_without:google_id', 'integer', 'nullable', 'between:0,1'],
-            'google_id' => ['required_without:fb_id', 'integer', 'nullable', 'between:0,1']
+            'first_name' => ['sometimes', 'required', 'string', 'max:255'],
+            'last_name' => ['sometimes', 'required', 'string', 'max:255'],
+            'fb_id' => ['sometimes', 'nullable', 'integer', 'between:0,1'],
+            'google_id' => ['sometimes', 'nullable', 'integer', 'between:0,1'],
+            'avatar' => ['sometimes', 'nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:5120'],
         ];
         return $this->validateRules($request, $rules);
     }

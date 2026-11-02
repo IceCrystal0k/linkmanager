@@ -167,6 +167,7 @@ Route::middleware(['auth:sanctum', 'checkstatus'])->group(function () {
         Route::put('links/{id}', 'update')->whereNumber('id');
         Route::delete('links', 'deleteSelected');
         Route::delete('links/{id}', 'delete')->whereNumber('id');
+        Route::post('links/selection', 'handleSelectionRequest');
     });
 
     // module actions

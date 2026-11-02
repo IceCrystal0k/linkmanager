@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Storage;
 
 class AuthController extends BaseController
 {
@@ -75,6 +76,9 @@ class AuthController extends BaseController
             // create a new token
             $appName = Config::get('app.name');
             $data['token'] = $user->createToken($appName)->plainTextToken;
+            $data['email'] = $user->email;
+            $avatar = $user->userInfo && $user->userInfo->avatar ? config('settings.user_avatar_path') . $user->userInfo->avatar : null;
+            $data['avatar'] = $avatar ? Storage::disk('public')->url($avatar) : null;
             $data['first_name'] = $user->first_name;
             $data['last_name'] = $user->last_name;
             $data['role_id'] = $userRole ? $userRole->role_id : null;

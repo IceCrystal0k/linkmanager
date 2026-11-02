@@ -10,6 +10,7 @@ use App\Helpers\UserUtils;
 use App\Http\Controllers\API\BaseController;
 use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Mews\Purifier\Facades\Purifier;
 
 
 /**
@@ -131,7 +132,7 @@ class LinkController extends BaseController
     {
         $validator = $this->validateItemRequest($request);
         if ($validator->failed) {
-            return $this->sendError([$validator->errors], HttpCode::BadRequest);
+            return $this->sendBadRequestResponse([$validator->errors]);
         }
         $response = $this->createItem($request);
         return $this->sendResponse($response, HttpCode::Created);
@@ -140,7 +141,7 @@ class LinkController extends BaseController
     /**
      * link get item
      *
-     * @param number $id product id
+     * @param int $id product id
      * @return \Illuminate\Http\JsonResponse a json response, with the entity if found, otherwise throws a 404 not found
      */
     public function getItem($id)
@@ -153,14 +154,14 @@ class LinkController extends BaseController
      * update link in database
      *
      * @param \Illuminate\Http\Request $request user request
-     * @param number $id link id to update
+     * @param int $id link id to update
      * @return \Illuminate\Http\JsonResponse a json response with the updated link or a Bad request with errors, if failed
      */
     public function update(Request $request, $id)
     {
         $validator = $this->validateItemRequest($request, $id);
         if ($validator->failed) {
-            return $this->sendError([$validator->errors], HttpCode::BadRequest);
+            return $this->sendBadRequestResponse([$validator->errors]);
         }
         $response = $this->saveItem($request, $id);
         return $this->sendResponse($response);
@@ -169,7 +170,7 @@ class LinkController extends BaseController
     /**
      * Delete link from db
      *
-     * @param number $id link id
+     * @param int $id link id
      * @return \Illuminate\Http\Response empty response if entity found and deleted, otherwise 404 not found
      */
     public function delete($id)
@@ -192,15 +193,38 @@ class LinkController extends BaseController
     public function deleteSelected(Request $request)
     {
         if (!$request->has('ids')) {
-            return $this->sendError(['Validation Error'], HttpCode::BadRequest);
+            return $this->sendBadRequestResponse(['Validation Error']);
         }
         $ids = json_decode($request->ids, JSON_NUMERIC_CHECK);
         $ids = ArrayUtils::transformToPositiveIntegers($ids);
         if (!$ids) {
-            return $this->sendError(['Validation Error'], HttpCode::BadRequest);
+            return $this->sendBadRequestResponse(['Validation Error']);
         }
         $this->model::whereIn('id', $ids)->delete();
         return $this->sendEmptyResponse(HttpCode::NoContent);
+    }
+
+    public function handleSelectionRequest(Request $request)
+    {
+        if (!$request->has('ids') || !$request->has('action')) {
+            return $this->sendBadRequestResponse(['Validation Error']);
+        }
+        $ids = json_decode($request->ids, JSON_NUMERIC_CHECK);
+        $ids = ArrayUtils::transformToPositiveIntegers($ids);
+        if (!$ids) {
+            return $this->sendBadRequestResponse(['Validation Error']);
+        }
+        switch ($request->action) {
+            case 'archive':
+                $response = $this->archiveItems($ids);
+                break;
+            case 'moveto':
+                $response = $this->moveItemsTo($ids, $request);
+                break;
+            default:
+                $response = $this->sendBadRequestResponse(['Bad request']);
+        }
+        return $response;
     }
 
     /**
@@ -226,7 +250,7 @@ class LinkController extends BaseController
     public function export(Request $request)
     {
         if (!$this->validateExport($request)) {
-            return $this->sendError(['Validation Error.'], HttpCode::BadRequest);
+            return $this->sendBadRequestResponse(['Validation Error.']);
         }
         $data = $this->getExportData($request);
         $fileName = $this->exportFileName . '-' . date('Y-m-d');
@@ -252,7 +276,7 @@ class LinkController extends BaseController
     /**
      * get link item for edit; throws a 404 not found exception if item not found in database
      *
-     * @param number $itemId link id
+     * @param int $itemId link id
      * @return \app\Models\Link link model
      */
     private function getItemForEdit($itemId)
@@ -346,7 +370,7 @@ class LinkController extends BaseController
      * validate item request before create / save
      *
      * @param \Illuminate\Http\Request $request user request
-     * @param number $id link id
+     * @param int $id link id
      * @return object an object with the fields { failed, errors }
      */
     private function validateItemRequest(Request $request, $id = null)
@@ -361,7 +385,7 @@ class LinkController extends BaseController
             'url' => ['required', 'string', 'max:255'],
             'category_id' => ['required', 'numeric', 'exists:categories,id'],
             'description' => ['string', 'max:255'],
-            'comment' => ['string', 'max:16383'], // utf8mb4 requires 4 bytes per char
+            'comment' => ['string', 'max:4194303'], // utf8mb4 requires 4 bytes per char
             'rating' => ['numeric', 'min:1', 'max:5'],
             'username' => ['string', 'max:255'],
             'password' => ['string', 'max:255'],
@@ -379,6 +403,7 @@ class LinkController extends BaseController
      */
     private function createItem(Request $request)
     {
+        $this->sanitizeComment($request);
         $item = new $this->model();
         Form::updateModelFromRequest($request, $item, $this->updateFields);
         $item->user_id = $this->userId;
@@ -391,11 +416,12 @@ class LinkController extends BaseController
      * update link in database, from provided request
      *
      * @param \Illuminate\Http\Request $request user request
-     * @param number $itemId id of the link to save
+     * @param int $itemId id of the link to save
      * @return \app\Models\Link the updated entity
      */
     private function saveItem(Request $request, $itemId)
     {
+        $this->sanitizeComment($request);
         $item = $this->model::findOrFail($itemId);
         Form::updateModelFromRequest($request, $item, $this->updateFields);
         $item->save();
@@ -403,5 +429,29 @@ class LinkController extends BaseController
         return $item;
     }
 
-    /** functions used to create / update role - END */
+    public function sanitizeComment(Request $request)
+    {
+        if ($request->has('comment')) {
+            $request->merge(['comment' => Purifier::clean($request->input('comment'))]);
+        }
+    }
+
+    /** functions used to create / update links - END */
+
+    private function archiveItems(array $ids) {}
+
+    private function moveItemsTo(array $ids, Request $request)
+    {
+        if (!$request->has('categoryId')) {
+            return $this->sendBadRequestResponse(['Validation Error']);
+        }
+        $categoryId = (int)$request->categoryId;
+        $category = Category::select('id')->where('id', $categoryId)->where('user_id', $this->userId)->first();
+        if (!$category) {
+            $this->sendError(['Category not found'], HttpCode::Gone);
+        }
+        Link::where('user_id', $this->userId)->whereIn('id', $ids)->update('category_id', $categoryId);
+        $response = 'Links category set to ' . $categoryId;
+        return $this->sendResponse($response, HttpCode::Created);
+    }
 }
