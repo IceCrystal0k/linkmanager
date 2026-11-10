@@ -9,6 +9,7 @@ use App\Helpers\ExportUtils;
 use App\Helpers\Form;
 use App\Http\Controllers\API\BaseController;
 use App\Models\Seo;
+use App\Models\Link;
 use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
 
@@ -24,7 +25,7 @@ class CategoryController extends BaseController
     private array $selectFields; // fields that will be updated on save
     private object $filterFields;
     private array $exportFields; // fields that are selected for export
-    private $userId;
+    private int $userId;
 
     public function __construct()
     {
@@ -213,6 +214,21 @@ class CategoryController extends BaseController
                 return $pdf->download($fileName . '.pdf');
                 break;
         }
+    }
+
+    public function handleRequest(Request $request)
+    {
+        if (!$request->has('action')) {
+            return $this->sendBadRequestResponse(['Validation Error']);
+        }
+        switch ($request->action) {
+            case 'move':
+                $response = $this->moveItemsTo($request);
+                break;
+            default:
+                $response = $this->sendBadRequestResponse(['Bad request']);
+        }
+        return $response;
     }
 
     /**
@@ -503,4 +519,28 @@ class CategoryController extends BaseController
     }
 
     /** functions used to create / update category - END */
+
+    /**
+     * Move subcategories and links to another category, specified by category_id in the request
+     */
+    private function moveItemsTo(Request $request)
+    {
+        if (!$request->has('from_id') || !$request->has('to_id')) {
+            return $this->sendBadRequestResponse(['Validation Error']);
+        }
+        $fromId = (int)$request->from_id;
+        $toId = (int)$request->to_id;
+        $categoryFrom = $this->model::select('id')->where('id', $fromId)->where('user_id', $this->userId)->first();
+        if (!$categoryFrom) {
+            $this->sendError(['Category From not found'], HttpCode::Gone);
+        }
+        $categoryTo = $this->model::select('id')->where('id', $toId)->where('user_id', $this->userId)->first();
+        if (!$categoryTo) {
+            $this->sendError(['Category To not found'], HttpCode::Gone);
+        }
+        $this->model::where('user_id', $this->userId)->where('parent_id', $fromId)->update(['parent_id' => $toId]);
+        Link::where('user_id', $this->userId)->where('category_id', $fromId)->update(['category_id' => $toId]);
+        $response = 'Parent set to ' . $toId . ' for all categories from category ' . $fromId;
+        return $this->sendResponse($response, HttpCode::Created);
+    }
 }

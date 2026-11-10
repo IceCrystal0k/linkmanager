@@ -10,6 +10,7 @@ use App\Models\Timezone;
 use App\Models\User;
 use App\Models\UserInfo;
 use App\Models\UserEmailToken;
+use App\Models\UsersModule;
 use App\Models\UsersRole;
 use App\Mail\Account\VerifyEmail;
 use Exception;
@@ -61,6 +62,8 @@ class SocialController extends BaseController
         $data['first_name'] = $user->first_name;
         $data['last_name'] = $user->last_name;
         $data['role_id'] = $userRole ? $userRole->role_id : null;
+        $data['date_format'] = $user->userInfo && $user->userInfo->date_format ? $user->userInfo->date_format : null;
+        $data['date_format_separator'] = $user->userInfo && $user->userInfo->date_format_separator ? $user->userInfo->date_format_separator : null;
 
         return $data;
     }
@@ -111,6 +114,9 @@ class SocialController extends BaseController
                     $this->saveSessionTimezone($createUser->id);
                     // set user role to User
                     $createUser->roles()->attach(UserRole::User);
+
+                    UsersModule::create(['user_id' => $user->id, 'module_id' => 1]);
+                    UsersModule::create(['user_id' => $user->id, 'module_id' => 2]);
 
                     // Auth::login($createUser);
                 }

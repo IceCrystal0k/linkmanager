@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\API\Links;
 
 use App\Enums\HttpCode;
+use App\Enums\SoftStatus;
+use App\Models\Category;
 use App\Helpers\ArrayUtils;
 use App\Helpers\ExportUtils;
 use App\Helpers\Form;
@@ -51,7 +53,7 @@ class LinkController extends BaseController
     public function list(Request $request)
     {
         // $selectedFields = [...$this->selectFields, 'category.category as category'];
-        $query = $this->model::with(['category'])->select($this->selectFields)->where('user_id', $this->userId);
+        $query = $this->model::with(['category'])->select($this->selectFields)->where('user_id', $this->userId)->where('status', SoftStatus::Active);
         $query = $this->applyFilters($query, $request);
 
         $dataCount = $query->count();
@@ -204,13 +206,12 @@ class LinkController extends BaseController
         return $this->sendEmptyResponse(HttpCode::NoContent);
     }
 
-    public function handleSelectionRequest(Request $request)
+    public function handleBatchRequest(Request $request)
     {
         if (!$request->has('ids') || !$request->has('action')) {
             return $this->sendBadRequestResponse(['Validation Error']);
         }
-        $ids = json_decode($request->ids, JSON_NUMERIC_CHECK);
-        $ids = ArrayUtils::transformToPositiveIntegers($ids);
+        $ids = ArrayUtils::transformToPositiveIntegers($request->ids);
         if (!$ids) {
             return $this->sendBadRequestResponse(['Validation Error']);
         }
@@ -218,7 +219,10 @@ class LinkController extends BaseController
             case 'archive':
                 $response = $this->archiveItems($ids);
                 break;
-            case 'moveto':
+            case 'delete':
+                $response = $this->deleteItems($ids);
+                break;
+            case 'move':
                 $response = $this->moveItemsTo($ids, $request);
                 break;
             default:
@@ -406,6 +410,7 @@ class LinkController extends BaseController
         $this->sanitizeComment($request);
         $item = new $this->model();
         Form::updateModelFromRequest($request, $item, $this->updateFields);
+        $item->status = SoftStatus::Active;
         $item->user_id = $this->userId;
         $item->save();
         $item->category = $item->category()->first();
@@ -438,19 +443,31 @@ class LinkController extends BaseController
 
     /** functions used to create / update links - END */
 
-    private function archiveItems(array $ids) {}
+    private function archiveItems(array $ids)
+    {
+        $this->model::where('user_id', $this->userId)->whereIn('id', $ids)->update(['status' => SoftStatus::Archived]);
+        $response = 'Links archived';
+        return $this->sendResponse($response, HttpCode::Created);
+    }
+
+    private function deleteItems(array $ids)
+    {
+        $this->model::where('user_id', $this->userId)->whereIn('id', $ids)->update(['status' => SoftStatus::Deleted]);
+        $response = 'Links deleted';
+        return $this->sendResponse($response, HttpCode::Created);
+    }
 
     private function moveItemsTo(array $ids, Request $request)
     {
-        if (!$request->has('categoryId')) {
+        if (!$request->has('category_id')) {
             return $this->sendBadRequestResponse(['Validation Error']);
         }
-        $categoryId = (int)$request->categoryId;
+        $categoryId = (int)$request->category_id;
         $category = Category::select('id')->where('id', $categoryId)->where('user_id', $this->userId)->first();
         if (!$category) {
             $this->sendError(['Category not found'], HttpCode::Gone);
         }
-        Link::where('user_id', $this->userId)->whereIn('id', $ids)->update('category_id', $categoryId);
+        $this->model::where('user_id', $this->userId)->whereIn('id', $ids)->update(['category_id' => $categoryId]);
         $response = 'Links category set to ' . $categoryId;
         return $this->sendResponse($response, HttpCode::Created);
     }

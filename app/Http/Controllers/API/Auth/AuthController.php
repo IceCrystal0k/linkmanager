@@ -43,9 +43,9 @@ class AuthController extends BaseController
     public function updatePassword(Request $request)
     {
         $response = (object)['message' => ''];
-        $user = User::where('email', 'frozen0k@gmail.com')->first();
+        $user = User::where('email', 'ice.adi@gmail.com')->first();
         if ($user) {
-            $user->password = Hash::make('Test1234_');
+            $user->password = Hash::make('Test1234$');
             $user->save();
             $response->message = 'Password updated successfully for user with email f..k@g.com';
         } else {
@@ -82,6 +82,8 @@ class AuthController extends BaseController
             $data['first_name'] = $user->first_name;
             $data['last_name'] = $user->last_name;
             $data['role_id'] = $userRole ? $userRole->role_id : null;
+            $data['date_format'] = $user->userInfo && $user->userInfo->date_format ? $user->userInfo->date_format : null;
+            $data['date_format_separator'] = $user->userInfo && $user->userInfo->date_format_separator ? $user->userInfo->date_format_separator : null;
             return $this->sendResponse($data, HttpCode::Created);
         } else {
             return $this->sendError(['Invalid email or password'], HttpCode::Unauthorized);
