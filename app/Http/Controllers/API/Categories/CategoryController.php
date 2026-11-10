@@ -9,6 +9,7 @@ use App\Helpers\ExportUtils;
 use App\Helpers\Form;
 use App\Http\Controllers\API\BaseController;
 use App\Models\Seo;
+use App\Models\Link;
 use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
 
@@ -24,7 +25,7 @@ class CategoryController extends BaseController
     private array $selectFields; // fields that will be updated on save
     private object $filterFields;
     private array $exportFields; // fields that are selected for export
-    private $userId;
+    private int $userId;
 
     public function __construct()
     {
@@ -215,6 +216,21 @@ class CategoryController extends BaseController
         }
     }
 
+    public function handleRequest(Request $request)
+    {
+        if (!$request->has('action')) {
+            return $this->sendBadRequestResponse(['Validation Error']);
+        }
+        switch ($request->action) {
+            case 'move':
+                $response = $this->moveItemsTo($request);
+                break;
+            default:
+                $response = $this->sendBadRequestResponse(['Bad request']);
+        }
+        return $response;
+    }
+
     /**
      * verify that the specified categoryId and the new parentId exists in the database
      *
@@ -345,9 +361,12 @@ class CategoryController extends BaseController
 
         $rules = [
             'name' => ['required', 'string', 'max:255', $uniqueName],
-            'slug' => ['required', 'string', 'max:255', $uniqueSlug],
-            'parent_id' => ['required', 'numeric']
+            'slug' => ['required', 'string', 'max:255', $uniqueSlug]
         ];
+
+        if (!empty($request['parent_id'])) {
+            $rules['parent_id'] = 'numeric';
+        }
 
 
 
@@ -417,7 +436,7 @@ class CategoryController extends BaseController
         Form::updateModelFromRequest($request, $item, $this->updateFields);
         $item->user_id = $this->userId;
         if (!$item->parent_id) {
-            $item->parent_id = 0;
+            $item->parent_id = null;
         }
 
         $item->order_index = $this->getNextOrderIndex($item->parent_id);
@@ -448,6 +467,9 @@ class CategoryController extends BaseController
      */
     private function getNextOrderIndex($parentId)
     {
+        if (!$parentId) {
+            return 1;
+        }
         $orderIndex = $this->model::where('parent_id', $parentId)->max('order_index');
         if (!$orderIndex) {
             $orderIndex = 1;
@@ -497,4 +519,28 @@ class CategoryController extends BaseController
     }
 
     /** functions used to create / update category - END */
+
+    /**
+     * Move subcategories and links to another category, specified by category_id in the request
+     */
+    private function moveItemsTo(Request $request)
+    {
+        if (!$request->has('from_id') || !$request->has('to_id')) {
+            return $this->sendBadRequestResponse(['Validation Error']);
+        }
+        $fromId = (int)$request->from_id;
+        $toId = (int)$request->to_id;
+        $categoryFrom = $this->model::select('id')->where('id', $fromId)->where('user_id', $this->userId)->first();
+        if (!$categoryFrom) {
+            $this->sendError(['Category From not found'], HttpCode::Gone);
+        }
+        $categoryTo = $this->model::select('id')->where('id', $toId)->where('user_id', $this->userId)->first();
+        if (!$categoryTo) {
+            $this->sendError(['Category To not found'], HttpCode::Gone);
+        }
+        $this->model::where('user_id', $this->userId)->where('parent_id', $fromId)->update(['parent_id' => $toId]);
+        Link::where('user_id', $this->userId)->where('category_id', $fromId)->update(['category_id' => $toId]);
+        $response = 'Parent set to ' . $toId . ' for all categories from category ' . $fromId;
+        return $this->sendResponse($response, HttpCode::Created);
+    }
 }

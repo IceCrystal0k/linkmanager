@@ -13,11 +13,15 @@ use App\Mail\Account\VerifyEmail;
 use App\Models\User;
 use App\Models\UserEmailToken;
 use App\Models\UserInfo;
+use App\Models\UsersModule;
 use App\Models\UsersPermission;
 use App\Models\UsersRole;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -60,7 +64,8 @@ class AccountController extends BaseController
 
         // create a custom response
         $response = [];
-        $response['token'] = $user->createToken(env('APP_NAME'))->plainTextToken;
+        $appName = Config::get('app.name');
+        $response['token'] = $user->createToken($appName)->plainTextToken;
         $response['first_name'] = $user->first_name;
         $response['last_name'] = $user->last_name;
         $response['email'] = $user->email;
@@ -68,6 +73,9 @@ class AccountController extends BaseController
 
         // set user role to User
         $user->roles()->attach(UserRole::User);
+        UsersModule::create(['user_id' => $user->id, 'module_id' => 1, 'order_index' => 1]);
+        UsersModule::create(['user_id' => $user->id, 'module_id' => 2, 'order_index' => 2]);
+
         // send verification email
         $emailResponse = $this->sendEmailVerificationNotification($user);
         $emailSendErrors = null;
@@ -110,6 +118,44 @@ class AccountController extends BaseController
         return $this->sendResponse($response);
     }
 
+    public function updateAvatar(User $user, UploadedFile $avatar)
+    {
+        $userInfo = $user->userInfo;
+        $reloadUserInfo = false;
+        if (!$userInfo) {
+            $userInfo = new UserInfo();
+            $userInfo->user_id = $user->id;
+            $reloadUserInfo = true;
+        }
+
+        $avatarFilename = 'user_' . $user->id . '.' . $avatar->extension();
+        $avatarPath = $avatar->storeAs(config('settings.user_avatar_path'), $avatarFilename, 'public');
+        if ($avatarPath === false) {
+            throw new \RuntimeException('Unable to store uploaded avatar.');
+        }
+
+        $userInfo->avatar = $avatarFilename;
+        $userInfo->save();
+        if ($reloadUserInfo) {
+            $user->load('userInfo');
+        }
+    }
+
+    public function deleteAvatar(User $user)
+    {
+        $userInfo = $user->userInfo;
+        if (!$userInfo) {
+            return; // No avatar to delete
+        }
+
+        if ($userInfo->avatar && !Storage::disk('public')->delete(config('settings.user_avatar_path') . $userInfo->avatar)) {
+            throw new \RuntimeException('Unable to delete stored avatar.');
+        }
+
+        $userInfo->avatar = '';
+        $userInfo->save();
+    }
+
     /**
      * Partial update account data
      *
@@ -125,8 +171,21 @@ class AccountController extends BaseController
 
         $authUser = auth('sanctum')->user();
         $user = User::findOrFail($authUser->id);
-        Form::updateModelFromRequest($request, $user, $this->partialUpdateFields);
+        Form::updateModelFromRequest($request, $user, array_merge($this->updateFields, $this->partialUpdateFields));
         $user->save();
+        if ($request->hasFile('avatar')) {
+            $this->updateAvatar($user, $request->file('avatar'));
+            $avatar = null;
+            if ($user->userInfo && $user->userInfo->avatar) {
+                $avatar = config('settings.user_avatar_path') . $user->userInfo->avatar;
+                $user->userInfo->avatar = Storage::disk('public')->url($avatar);
+            }
+        } else if ($request->has('avatar_deleted')) {
+            $this->deleteAvatar($user);
+            if ($user->userInfo) {
+                $user->userInfo->avatar_deleted = 1;
+            }
+        }
         $response = $user;
         return $this->sendResponse($response);
     }
@@ -144,17 +203,20 @@ class AccountController extends BaseController
         }
         $action = $request->has('action') ? $request->action : null;
         switch ($action) {
-            case 'verify-email':$response = $this->sendVerificationEmail();
+            case 'verify-email':
+                $response = $this->sendVerificationEmail();
                 break;
-            case 'remove-account':$response = $this->sendRemoveAccountEmail();
+            case 'remove-account':
+                $response = $this->sendRemoveAccountEmail();
                 break;
-            default:$response = $this->sendError(['Invalid request'], HttpCode::BadRequest);
+            default:
+                $response = $this->sendError(['Invalid request'], HttpCode::BadRequest);
                 break;
         }
         return $response;
     }
 
-     /**
+    /**
      * Send an email for an authorized session, according to the specified action
      *
      * @param \Illuminate\Http\Request $request user request
@@ -167,9 +229,11 @@ class AccountController extends BaseController
         }
         $action = $request->has('action') ? $request->action : null;
         switch ($action) {
-            case 'reset-password':$response = $this->sendResetPasswordEmail($request);
+            case 'reset-password':
+                $response = $this->sendResetPasswordEmail($request);
                 break;
-            default:$response = $this->sendError(['Invalid request'], HttpCode::BadRequest);
+            default:
+                $response = $this->sendError(['Invalid request'], HttpCode::BadRequest);
                 break;
         }
         return $response;
@@ -184,7 +248,7 @@ class AccountController extends BaseController
     {
         $user = auth('sanctum')->user();
         if ($user->email_verified_at) {
-            return $this->sendError(['Email already verified'], HttpCode::AlreadyReported);
+            return $this->sendEmptyResponse(HttpCode::OK);
         }
 
         // send verification email
@@ -252,7 +316,7 @@ class AccountController extends BaseController
      * @param Request $request user request, must contain the field : 'action'
      * @return \Illuminate\Http\Response an empty response if the request was handled, or an error
      */
-    public function handleAccountRequests(Request $request)
+    public function handleAccountRequest(Request $request)
     {
         if (!$request->has('action')) {
             $this->sendError(['Action not specified'], HttpCode::BadRequest);
@@ -260,17 +324,26 @@ class AccountController extends BaseController
 
         $action = $request->has('action') ? $request->action : null;
         switch ($action) {
-            case 'confirm-email':$response = $this->confirmAccountVerification($request);
+            case 'confirm-email':
+                $response = $this->confirmAccountVerification($request);
                 break;
-            case 'remove-account':$response = $this->removeAccount($request);
+            case 'remove-account':
+                $response = $this->removeAccount($request);
                 break;
-            case 'token-info':$response = $this->getTokenInfo($request);
+            case 'token-info':
+                $response = $this->getTokenInfo($request);
                 break;
-            case 'reset-password':$response = $this->resetPassword($request);
+            case 'reset-password':
+                $response = $this->resetPassword($request);
                 break;
-            case 'update-password':$response = $this->updateUserPassword($request);
+            case 'update-password':
+                $response = $this->updateUserPassword($request);
                 break;
-            default:$response = $this->sendError(['Invalid request'], HttpCode::BadRequest);
+            case 'update-settings':
+                $response = $this->updateUserSettings($request);
+                break;
+            default:
+                $response = $this->sendError(['Invalid request'], HttpCode::BadRequest);
                 break;
         }
         return $response;
@@ -290,6 +363,7 @@ class AccountController extends BaseController
         }
         $tokenItem = UserEmailToken::where('token', $request->token)->where('action', 'verify-email')->first();
         $validRequest = $this->isValidUserEmailToken($tokenItem);
+
         if ($validRequest) {
             $tokenItem->delete();
             // activate the user
@@ -390,7 +464,7 @@ class AccountController extends BaseController
         $tokenItem = UserEmailToken::where('token', $request->token)->where('action', 'reset-password')->first();
         $validRequest = $this->isValidUserEmailToken($tokenItem);
         if ($validRequest) {
-            $validator = $this->validatePassword($request);
+            $validator = $this->validateResetPassword($request);
             if ($validator->failed) {
                 return $this->sendError($validator->errors, HttpCode::BadRequest);
             }
@@ -412,7 +486,8 @@ class AccountController extends BaseController
                 $userRole = UsersRole::where('user_id', $user->id)->select('role_id')->first();
 
                 // create a new token
-                $data['token'] = $user->createToken(env('APP_NAME'))->plainTextToken;
+                $appName = Config::get('app.name');
+                $data['token'] = $user->createToken($appName)->plainTextToken;
                 $data['first_name'] = $user->first_name;
                 $data['last_name'] = $user->last_name;
                 $data['role_id'] = $userRole ? $userRole->role_id : null;
@@ -438,9 +513,51 @@ class AccountController extends BaseController
             return $this->sendError($validator->errors, HttpCode::BadRequest);
         }
         $user = auth('sanctum')->user();
+        if (!$user) {
+            return $this->sendError(['Unauthenticated'], HttpCode::Unauthorized);
+        }
+        if (!Hash::check($request->current_password, $user->password)) {
+            return $this->sendError(
+                ['current_password' => [__('validation.current_password')]],
+                HttpCode::BadRequest
+            );
+        }
+
         // update the user password
         $this->updatePassword($user, $request->password);
         return $this->sendEmptyResponse(HttpCode::Created);
+    }
+
+    public function updateUserSettings(Request $request)
+    {
+        $user = auth('sanctum')->user();
+        if (!$user) {
+            return $this->sendError(['Unauthenticated'], HttpCode::Unauthorized);
+        }
+
+        if (!$request->has('date_format') || !$request->has('date_format_separator')) {
+            return $this->sendError(['Invalid settings data'], HttpCode::BadRequest);
+        }
+
+        $dateFormat = (int)$request->date_format;
+        $dateFormatSeparator = (int)$request->date_format_separator;
+
+        $reloadUserInfo = false;
+        $userInfo = $user->userInfo;
+        if (!$userInfo) {
+            $userInfo = new UserInfo();
+            $userInfo->user_id = $user->id;
+            $reloadUserInfo = true;
+        }
+
+        $userInfo->date_format = $dateFormat;
+        $userInfo->date_format_separator = $dateFormatSeparator;
+
+        $userInfo->save();
+        if ($reloadUserInfo) {
+            $user->load('userInfo');
+        }
+        return $this->sendResponse($userInfo, HttpCode::Created);
     }
 
     /**
@@ -485,8 +602,11 @@ class AccountController extends BaseController
     private function validatePartialUpdate(Request $request)
     {
         $rules = [
-            'fb_id' => ['required_without:google_id', 'integer', 'nullable', 'between:0,1'],
-            'google_id' => ['required_without:fb_id', 'integer', 'nullable', 'between:0,1']
+            'first_name' => ['sometimes', 'required', 'string', 'max:255'],
+            'last_name' => ['sometimes', 'required', 'string', 'max:255'],
+            'fb_id' => ['sometimes', 'nullable', 'integer', 'between:0,1'],
+            'google_id' => ['sometimes', 'nullable', 'integer', 'between:0,1'],
+            'avatar' => ['sometimes', 'nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:5120'],
         ];
         return $this->validateRules($request, $rules);
     }
@@ -529,8 +649,24 @@ class AccountController extends BaseController
     private function validatePassword(Request $request)
     {
         $rules = [
+            'current_password' => ['required', 'min:8', 'max:255'],
             'password' => ['required', 'min:8', 'max:255'],
             'repeat_password' => 'required|same:password',
+        ];
+
+        return $this->validateRules($request, $rules, $this->customValidation);
+    }
+
+    /**
+     * validate reset password
+     *
+     * @param \Illuminate\Http\Request $request user request
+     * @return object response with { failed, errors }
+     */
+    private function validateResetPassword(Request $request)
+    {
+        $rules = [
+            'password' => ['required', 'min:8', 'max:255'],
         ];
 
         return $this->validateRules($request, $rules, $this->customValidation);
@@ -700,7 +836,7 @@ class AccountController extends BaseController
         if ($userEmailToken) {
             // allow only one email / 5 minutes
             if ($userEmailToken->created_at) {
-                $requestDate = \Carbon\Carbon::createFromFormat('Y-m-d H:s:i', $userEmailToken->created_at);
+                $requestDate = \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $userEmailToken->created_at);
                 $now = \Carbon\Carbon::now();
                 $diffMinutes = $requestDate->diffInMinutes($now);
                 if ($diffMinutes < 5) {
@@ -732,7 +868,7 @@ class AccountController extends BaseController
     {
         $validRequest = false;
         if ($tokenItem && $tokenItem->created_at) {
-            $requestDate = \Carbon\Carbon::createFromFormat('Y-m-d H:s:i', $tokenItem->created_at);
+            $requestDate = \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $tokenItem->created_at);
             $now = \Carbon\Carbon::now();
             $diffHours = $requestDate->diffInHours($now);
             // verify if the token was created in the last 24 hours
@@ -753,9 +889,11 @@ class AccountController extends BaseController
     {
         $key = '';
         switch ($action) {
-            case 'remove-account':$key = 'AccountDeletedMailFrequency';
+            case 'remove-account':
+                $key = 'AccountDeletedMailFrequency';
                 break;
-            case 'verify-email':$key = 'AccountVerifyMailFrequency';
+            case 'verify-email':
+                $key = 'AccountVerifyMailFrequency';
                 break;
         }
         return __($this->translationPrefix . $key);

@@ -9,4 +9,5 @@ class UsersModule extends Model
 {
     use HasFactory;
     public $timestamps = false;
+    protected $fillable = ['user_id', 'module_id', 'order_index'];
 }

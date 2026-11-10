@@ -46,9 +46,18 @@ return [
         2 => '-',
         3 => '/',
     ],
-    'link_status' => [
+    'link_verification_status' => [
         0 => 'notverified',
         1 => 'verified',
         2 => 'failed',
     ],
+    'soft_status' => [
+        0 => 'pending',
+        1 => 'active',
+        2 => 'archived',
+        3 => 'deleted',
+    ],
+    'user_avatar_path' => '/users/avatars/',
+    'user_avatar_max_size' => 2048, // in KB
+    'user_avatar_allowed_extensions' => ['jpg', 'jpeg', 'png', 'gif']
 ];

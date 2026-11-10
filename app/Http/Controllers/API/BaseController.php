@@ -1,6 +1,8 @@
 <?php
+
 namespace App\Http\Controllers\API;
 
+use App\Enums\HttpCode;
 use App\Http\Controllers\Controller as Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -13,7 +15,7 @@ class BaseController extends Controller
      * success response method.
      *
      * @param mixed $result the result to return
-     * @param number $status the http status code to return
+     * @param int $status the http status code to return
      * @param array $extraInfo additional information to be added to the response, can contain totalCount, etc
      * @return \Illuminate\Http\JsonResponse
      */
@@ -51,7 +53,7 @@ class BaseController extends Controller
      * create a response from the provided params
      *
      * @param mixed $data data to return
-     * @param number $status the http status code to return
+     * @param int $status the http status code to return
      * @param array $extraInfo extra info to add to the response
      * @return array an associative array with the response
      */
@@ -74,10 +76,10 @@ class BaseController extends Controller
      *
      * @param \Illuminate\Http\Request $request user request object
      * @param array $rules rules to validate
-     * @param callable $customValidation optional function to set custom validation
+     * @param callable|null $customValidation optional function to set custom validation
      * @return object response with { failed, errors }
      */
-    protected function validateRules(Request $request, array $rules, callable $customValidation = null)
+    protected function validateRules(Request $request, array $rules, ?callable $customValidation = null)
     {
         $validator = Validator::make($request->all(), $rules);
         if ($customValidation) {
@@ -88,5 +90,10 @@ class BaseController extends Controller
         $failed = $validator->fails();
         $response = (object) ['failed' => $failed, 'errors' => $validator->errors()];
         return $response;
+    }
+
+    protected function sendBadRequestResponse(array $errors)
+    {
+        return $this->sendError($errors, HttpCode::BadRequest);
     }
 }

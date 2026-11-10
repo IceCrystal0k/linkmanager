@@ -24,6 +24,10 @@ class ThrottleSuccess extends ThrottleRequests
         $response = $next($request); // call the controller first
         $responseData = $response->getData();
 
+        if (isset($responseData->errors)) {
+            return $response;
+        }
+
         if ($responseData->status === HttpCode::OK || $responseData->status === HttpCode::Created) { // only hit limiter on successful response
             foreach ($limits as $limit) {
                 if ($this->limiter->tooManyAttempts($limit->key, $limit->maxAttempts)) {

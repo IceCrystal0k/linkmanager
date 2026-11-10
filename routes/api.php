@@ -52,12 +52,12 @@ Route::controller(AccountController::class)->group(function () {
         Route::post('accounts', 'register');
     });
 
-    // allow only 3 actions / minute for the same session
-    Route::middleware(['throttle:3,1'])->group(function () {
-        Route::post('accounts/requests', 'handleAccountRequests');
+    // allow only 5 actions / minute for the same session
+    Route::middleware(['throttle:5,1'])->group(function () {
+        Route::post('accounts/requests', 'handleAccountRequest');
     });
-    // allow users who don't have the email verified, to send emails; only one email / 5 minutes
-    Route::middleware(['throttle:1,5', 'auth:sanctum'])->group(function () {
+    // allow users who don't have the email verified, to send emails; only 3 emails / 5 minutes
+    Route::middleware(['throttle:3,5', 'auth:sanctum'])->group(function () {
         Route::post('accounts/emails', 'sendEmail');
     });
 
@@ -118,6 +118,7 @@ Route::middleware(['auth:sanctum', 'checkstatus'])->group(function () {
         Route::put('categories/{id}', 'update')->whereNumber('id');
         Route::delete('categories', 'deleteSelected');
         Route::delete('categories/{id}', 'delete')->whereNumber('id');
+        Route::post('categories/requests', 'handleRequest');
     });
 
 
@@ -130,7 +131,7 @@ Route::middleware(['auth:sanctum', 'checkstatus'])->group(function () {
         Route::put('users/{id}', 'update')->whereNumber('id');
         Route::delete('users', 'deleteSelected');
         Route::delete('users/{id}', 'delete')->whereNumber('id');
-        Route::delete('users/{id}/requests', 'handleRequests')->whereNumber('id');
+        Route::delete('users/{id}/requests', 'handleRequest')->whereNumber('id');
     });
 
     // user roles actions
@@ -167,6 +168,7 @@ Route::middleware(['auth:sanctum', 'checkstatus'])->group(function () {
         Route::put('links/{id}', 'update')->whereNumber('id');
         Route::delete('links', 'deleteSelected');
         Route::delete('links/{id}', 'delete')->whereNumber('id');
+        Route::post('links/batch', 'handleBatchRequest');
     });
 
     // module actions

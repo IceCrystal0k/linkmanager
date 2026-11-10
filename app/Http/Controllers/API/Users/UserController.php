@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\API\Users;
 
 use App\Enums\HttpCode;
@@ -125,7 +126,7 @@ class UserController extends BaseController
         return $this->sendResponse($data);
     }
 
-     /**
+    /**
      * update user in database
      *
      * @param \Illuminate\Http\Request $request user request
@@ -235,12 +236,17 @@ class UserController extends BaseController
      * @param number $id user id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function handleRequests(Request $request, $id)
+    public function handleRequest(Request $request, $id)
     {
         switch ($request->action) {
-            case 'activate': $response = $this->activate($request, $id); break;
-            case 'deactivate': $response = $this->deactivate($request, $id); break;
-            default: $response = $this->sendError('Bad request', HttpCode::BadRequest);
+            case 'activate':
+                $response = $this->activate($request, $id);
+                break;
+            case 'deactivate':
+                $response = $this->deactivate($request, $id);
+                break;
+            default:
+                $response = $this->sendError('Bad request', HttpCode::BadRequest);
         }
         return $response;
     }
@@ -301,15 +307,15 @@ class UserController extends BaseController
         $rules = [
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
-            'status' => ['required', 'numeric', 'in:'.$statusList],
-            'role' => ['required', 'numeric', 'in:'.$roleList.'']
+            'status' => ['required', 'numeric', 'in:' . $statusList],
+            'role' => ['required', 'numeric', 'in:' . $roleList . '']
         ];
         $customValidation = null;
         // add password rules when creating the user or when editing the user and the password is present
         if (!$id || $request->has('password')) {
             $rules['password'] = $rulePassword;
             $rules['repeat_password'] = $ruleRepeatPassword;
-            $customValidation = function($request, $validator) {
+            $customValidation = function ($request, $validator) {
                 return $this->validatePasswordStrength($request, $validator);
             };
         }
@@ -401,8 +407,16 @@ class UserController extends BaseController
         $exportRole = $request->has('export_role') ? $request->export_role : null;
 
         $query = $this->model::leftJoin('users_roles', 'users.id', '=', 'users_roles.user_id')
-            ->select(['id', DB::raw("CONCAT(first_name,' ', last_name) as full_name"), 'email',
-                'updated_at', 'google_id', 'fb_id', 'status', 'role_id']);
+            ->select([
+                'id',
+                DB::raw("CONCAT(first_name,' ', last_name) as full_name"),
+                'email',
+                'updated_at',
+                'google_id',
+                'fb_id',
+                'status',
+                'role_id'
+            ]);
 
         if ($exportDateRange) {
             list($dateStart, $dateEnd) = explode(' - ', $exportDateRange);
@@ -410,7 +424,7 @@ class UserController extends BaseController
                 $dateStart = \Carbon\Carbon::parse($dateStart);
                 $dateEnd = \Carbon\Carbon::parse($dateEnd);
                 $query->whereBetween('created_at', [$dateStart, $dateEnd]);
-            } catch (\Exception$e) {
+            } catch (\Exception $e) {
                 // show some error
             }
         }
@@ -459,8 +473,16 @@ class UserController extends BaseController
      */
     private function getCsvContent($data)
     {
-        $columnList = [__('tables.Id'), __('tables.Name'), __('tables.Email'), __('tables.Role'), __('tables.UpdatedAt'),
-        __('tables.Google'), __('tables.Facebook'), __('tables.Status')];
+        $columnList = [
+            __('tables.Id'),
+            __('tables.Name'),
+            __('tables.Email'),
+            __('tables.Role'),
+            __('tables.UpdatedAt'),
+            __('tables.Google'),
+            __('tables.Facebook'),
+            __('tables.Status')
+        ];
 
         return ExportUtils::getCsvContent($data, $columnList, $this->exportFields);
     }
@@ -496,6 +518,4 @@ class UserController extends BaseController
         PersonalAccessToken::whereIn('tokenable_id', $usersIds)
             ->where('tokenable_type', 'APP\Models\User')->delete();
     }
-
-
 }
