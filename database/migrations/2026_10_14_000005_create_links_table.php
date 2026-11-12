@@ -15,8 +15,11 @@ return new class extends Migration {
             $table->unsignedInteger('category_id');
             $table->string('name', 100);
             $table->string('url');
+            $table->decimal('price', 10, 2)->nullable();
+            $table->unsignedInteger('price')->nullable();
             $table->string('description')->nullable();
             $table->text('comment')->nullable();
+            $table->unsignedTinyInteger('status');
             $table->unsignedTinyInteger('rating')->nullable();
             $table->unsignedInteger('visits')->nullable();
             $table->timestamp('last_verified_at')->nullable();

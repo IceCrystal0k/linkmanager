@@ -33,4 +33,9 @@ class Link extends Model
     {
         return $this->hasOne(Category::class, 'id', 'category_id')->select(['id', 'name', 'module_id']);
     }
+
+    public function currency()
+    {
+        return $this->hasOne(Currency::class, 'id', 'currency_id')->select(['id', 'name', 'symbol']);
+    }
 }
