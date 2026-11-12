@@ -23,19 +23,19 @@ class LinkController extends BaseController
     protected $exportFileName = 'links';
     protected $translationPrefix = 'links.';
     protected $model = 'App\Models\Link';
-    private $updateFields; // fields that will be updated on save
-    private $selectFields;
-    private $userSettings;
-    private $filterFields;
-    private $exportFields; // fields that are selected for export
-    private $userId;
+    private array $updateFields; // fields that will be updated on save
+    private array $selectFields;
+    private object $userSettings;
+    private array $filterFields;
+    private array $exportFields; // fields that are selected for export
+    private int $userId;
 
     public function __construct()
     {
-        $this->updateFields = ['category_id', 'name', 'url', 'description', 'comment', 'rating', 'visits', 'last_verified_at', 'verification_status', 'username', 'password', 'auth_info'];
-        $this->selectFields = ['id', 'category_id', 'name', 'url', 'description', 'comment', 'rating', 'visits', 'last_verified_at', 'verification_status', 'username', 'password', 'auth_info', 'created_at', 'updated_at'];
-        $this->filterFields = ['search', 'name', 'category_id', 'url', 'description', 'comment', 'rating', 'visits', 'verification_status', 'created_at'];
-        $this->exportFields = ['id', 'category_name', 'name', 'url', 'rating', 'visits', 'status_name', 'created_at'];
+        $this->updateFields = ['category_id', 'name', 'url', 'price', 'currency_id', 'description', 'comment', 'rating', 'visits', 'last_verified_at', 'verification_status', 'username', 'password', 'auth_info'];
+        $this->selectFields = ['id', 'category_id', 'name', 'url', 'price', 'currency_id', 'description', 'comment', 'rating', 'visits', 'last_verified_at', 'verification_status', 'username', 'password', 'auth_info', 'created_at', 'updated_at'];
+        $this->filterFields = ['search', 'name', 'category_id', 'url', 'price', 'currency_id', 'description', 'comment', 'rating', 'visits', 'verification_status', 'created_at'];
+        $this->exportFields = ['id', 'category_name', 'name', 'url', 'price', 'currency_id', 'rating', 'visits', 'status_name', 'created_at'];
 
         $this->middleware(function ($request, $next) {
             $this->userId = auth('sanctum')->user()->id;
@@ -53,7 +53,7 @@ class LinkController extends BaseController
     public function list(Request $request)
     {
         // $selectedFields = [...$this->selectFields, 'category.category as category'];
-        $query = $this->model::with(['category'])->select($this->selectFields)->where('user_id', $this->userId)->where('status', SoftStatus::Active);
+        $query = $this->model::with(['category'])->with(['currency'])->select($this->selectFields)->where('user_id', $this->userId)->where('status', SoftStatus::Active);
         $query = $this->applyFilters($query, $request);
 
         $dataCount = $query->count();
@@ -410,10 +410,14 @@ class LinkController extends BaseController
         $this->sanitizeComment($request);
         $item = new $this->model();
         Form::updateModelFromRequest($request, $item, $this->updateFields);
+        if ($item->price !== null) {
+            $item->price = str_replace(',', '.', (string) $item->price);
+        }
         $item->status = SoftStatus::Active;
         $item->user_id = $this->userId;
         $item->save();
         $item->category = $item->category()->first();
+        $item->currency = $item->currency()->first();
         return $item;
     }
 
@@ -429,8 +433,12 @@ class LinkController extends BaseController
         $this->sanitizeComment($request);
         $item = $this->model::findOrFail($itemId);
         Form::updateModelFromRequest($request, $item, $this->updateFields);
+        if ($item->price !== null) {
+            $item->price = str_replace(',', '.', (string) $item->price);
+        }
         $item->save();
         $item->category = $item->category()->first();
+        $item->currency = $item->currency()->first();
         return $item;
     }
 
